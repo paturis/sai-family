@@ -239,7 +239,7 @@ Cloud.makeCode=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let 
 
 /* ---------------- practice mode (memory + localStorage) ---------------- */
 function memImpl(){
-  const KEY='sfeudPractice_v1';let db={questions:{},surveys:{},data:{},live:{},answers:{},display:{}};
+  const KEY='sfeudPractice_v1';let db={questions:{},surveys:{},data:{},live:{},answers:{},display:{},team:{}};
   try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)db=Object.assign(db,s)}catch(e){}
   const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}};
   const user={email:'practice@local',name:'Practice mode',uid:'practice'};
@@ -247,6 +247,9 @@ function memImpl(){
     async init(){},
     onAuth(cb){setTimeout(()=>cb(user),0)},
     async signIn(){},async signOut(){},async getRole(){return 'admin'},
+    async listTeam(){const t=Object.assign({'practice@local':'admin'},db.team||{});return Object.keys(t).sort().map(e=>({email:e,role:t[e]}))},
+    async saveTeam(email,role){(db.team=db.team||{})[email]=role;save()},
+    async deleteTeam(email){if(db.team)delete db.team[email];save()},
     async listQuestions(){return Object.values(db.questions).map(clone)},
     async saveQuestion(q){q=clone(q);q.id=q.id||newId();q.updatedAt=Date.now();q.createdAt=q.createdAt||Date.now();db.questions[q.id]=q;save();return q.id},
     async deleteQuestion(id){delete db.questions[id];save()},
@@ -284,6 +287,9 @@ async function fbImpl(cfg){
     async signIn(){await Au.signInWithPopup(auth,new Au.GoogleAuthProvider())},
     async signOut(){await Au.signOut(auth)},
     async getRole(u){try{const s=await F.getDoc(F.doc(db,'admins',u.email));const r=s.exists()?s.data().role:null;return ['admin','tech','host'].includes(r)?r:null}catch(e){return null}},
+    async listTeam(){const s=await F.getDocs(col('admins'));return s.docs.map(d=>({email:d.id,role:d.data().role})).sort((a,b)=>a.email.localeCompare(b.email))},
+    async saveTeam(email,role){await F.setDoc(F.doc(db,'admins',email),{role:role})},
+    async deleteTeam(email){await F.deleteDoc(F.doc(db,'admins',email))},
     async listQuestions(){const s=await F.getDocs(col('questions'));return s.docs.map(d=>Object.assign({id:d.id},d.data()))},
     async saveQuestion(q){q=strip(q);const id=q.id;delete q.id;q.updatedAt=Date.now();
       if(id){await F.setDoc(F.doc(db,'questions',id),q);return id}q.createdAt=Date.now();return (await F.addDoc(col('questions'),q)).id},
@@ -328,7 +334,7 @@ window.Cloud=Cloud;
 const KEY='sfeudApp_v2';
 let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
 saved=saved||{};
-const A={stage:'login',user:null,role:'admin',tab:'surveys',surveys:[],bank:[],filt:{q:'',kind:'',tag:''},qf:null,form:null,sv:null,
+const A={stage:'login',user:null,role:'admin',tab:'surveys',surveys:[],bank:[],team:[],filt:{q:'',kind:'',tag:''},qf:null,form:null,sv:null,
   secs:saved.secs||45,pts:saved.pts||'pct',tabQ:0,raw:null,groups:{},q:-1,phase:'idle',closesAt:0,count:0,status:'',sim:true,surveyId:null,busy:false};
 let SEL={},proj=false,tickT=null,pollT=null,simT=null,nextId=1,grpT=null,gameT=null;
 const $=id=>document.getElementById(id);
@@ -485,12 +491,21 @@ function vDenied(){return`<div class="r0-wrap">${bar()}<div class="r0-card a-nar
 function chip(st){const m={draft:['Draft',''],live:['Live','warn'],closed:['Survey closed',''],ready:['Board ready','ok']}[st]||[st,''];return`<span class="r0-chip ${m[1]}">${m[0]}</span>`}
 function vDash(){
   if(!isAdmin())A.tab='surveys';
-  const tabs=isAdmin()?`<div class="a-tabs"><button class="${A.tab==='surveys'?'on':''}" data-a="tab" data-t="surveys">Surveys &amp; past results</button><button class="${A.tab==='bank'?'on':''}" data-a="tab" data-t="bank">Question bank (${A.bank.length})</button></div>`:'';
-  return`<div class="r0-wrap wide">${bar()}<div class="r0-tabbar"><h1>Dashboard</h1></div>${tabs}${A.tab==='surveys'?vSurveyList():vBank()}<div class="r0-status ${/fail|could not|error/i.test(A.status)?'bad':''}">${esc(A.status)}</div></div>`}
+  const tabs=isAdmin()?`<div class="a-tabs"><button class="${A.tab==='surveys'?'on':''}" data-a="tab" data-t="surveys">Surveys &amp; past results</button><button class="${A.tab==='bank'?'on':''}" data-a="tab" data-t="bank">Question bank (${A.bank.length})</button><button class="${A.tab==='team'?'on':''}" data-a="tab" data-t="team">Team (${A.team.length})</button></div>`:'';
+  return`<div class="r0-wrap wide">${bar()}<div class="r0-tabbar"><h1>Dashboard</h1></div>${tabs}${A.tab==='surveys'?vSurveyList():A.tab==='team'?vTeam():vBank()}<div class="r0-status ${/fail|could not|error/i.test(A.status)?'bad':''}">${esc(A.status)}</div></div>`}
 function vSurveyList(){
   const rows=A.surveys.map(s=>`<div class="a-row"><div class="a-main"><b>${esc(s.name)}</b> ${chip(s.status)}<div class="a-meta">${s.questions.length} questions · created ${fmt(s.createdAt)}${s.responses?' · '+s.responses+' respondents':''}${s.code&&s.status==='live'?' · code '+esc(s.code):''}</div></div>
     <div class="r0-btns"><button class="btn small gold" data-a="opensv" data-id="${s.id}">Open</button></div></div>`).join('');
   return`<div class="r0-card">${isAdmin()?'<div class="r0-btns" style="margin:0 0 12px"><button class="btn gold" data-a="newsv">+ New survey</button></div>':''}${rows||('<p class="r0-p">No surveys yet. '+(isAdmin()?'Create your first survey from the question bank.':'Ask an admin to create one.')+'</p>')}</div>`}
+function vTeam(){
+  const me=(A.user&&A.user.email||'').toLowerCase(),roles=['admin','tech','host'];
+  const desc={admin:'Everything: question bank, surveys, team, and running the game',tech:'Runs Round 0 and operates the board (no bank, no deleting surveys)',host:'Read-only emcee view'};
+  const rows=A.team.map(m=>{const self=m.email===me;
+    return`<tr><td>${esc(m.email)}${self?' <span class="r0-sub">(you)</span>':''}</td><td><select data-a="teamrole" data-e="${esc(m.email)}"${self?' disabled':''}>${roles.map(r=>`<option value="${r}"${m.role===r?' selected':''}>${r}</option>`).join('')}</select></td><td>${self?'':`<button class="btn" data-a="teamdel" data-e="${esc(m.email)}">Remove</button>`}</td></tr>`}).join('');
+  return`<div class="r0-card"><h2>Team</h2><p class="r0-sub">Only people listed here can sign in. Use their Google account email.</p>
+   <table class="r0-table" style="width:100%;text-align:left"><thead><tr><th>Email</th><th>Role</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="3">No one yet.</td></tr>'}</tbody></table>
+   <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><input id="teamEmail" type="email" placeholder="name@gmail.com" style="flex:1;min-width:220px"><select id="teamRole">${roles.map(r=>`<option value="${r}"${r==='tech'?' selected':''}>${r}</option>`).join('')}</select><button class="btn gold" data-a="teamadd">Add person</button></div>
+   <p class="r0-sub" style="margin-top:10px">${roles.map(r=>'<b>'+r+'</b>: '+desc[r]).join('<br>')}</p></div>`}
 function vBank(){
   const f=A.filt,tags=[...new Set(A.bank.flatMap(q=>q.tags||[]))].sort();
   const list=A.bank.filter(q=>(!f.kind||q.kind===f.kind)&&(!f.tag||(q.tags||[]).includes(f.tag))&&(!f.q||(q.en+' '+q.category).toLowerCase().includes(f.q.toLowerCase())))
@@ -598,7 +613,7 @@ function setStatus(m){A.status=m;const s=document.querySelector('.r0-status');if
 async function guard(fn,msg){if(A.busy)return;A.busy=true;try{await fn()}catch(e){console.error(e);setStatus((msg||'Something went wrong')+': '+(e&&e.message||e));paint()}A.busy=false}
 
 /* ================= data loading ================= */
-async function loadAll(){A.surveys=await Cloud.listSurveys();A.bank=await Cloud.listQuestions()}
+async function loadAll(){A.surveys=await Cloud.listSurveys();A.bank=await Cloud.listQuestions();if(isAdmin()){try{A.team=await Cloud.listTeam()}catch(e){A.team=[]}}}
 async function goDash(){await loadAll();A.stage='dash';A.sv=null;persistA();paint()}
 async function onUser(u){
   if(!u){A.user=null;A.stage='login';paint();return}
@@ -737,6 +752,12 @@ document.addEventListener('click',async e=>{
       const ordered=orderQs(qs);
       if(f.id){await Cloud.updateSurvey(f.id,{name:f.name,questions:ordered});await openSv(f.id)}
       else{const id=await Cloud.createSurvey({name:f.name,status:'draft',questions:ordered,code:''});await loadAll();await openSv(id)}},'Could not save the survey');
+    case 'teamadd':return guard(async()=>{const em=($('teamEmail').value||'').trim().toLowerCase(),role=$('teamRole').value;
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){alert('Enter a valid email address.');return}
+      if(em===(A.user.email||'').toLowerCase()){alert('That is you.');return}
+      await Cloud.saveTeam(em,role);A.team=await Cloud.listTeam();A.status=em+' added as '+role+'.';paint()},'Could not add');
+    case 'teamdel':return guard(async()=>{const em=b.dataset.e;if(!confirm('Remove '+em+'? They will no longer be able to sign in.'))return;
+      await Cloud.deleteTeam(em);A.team=await Cloud.listTeam();A.status=em+' removed.';paint()},'Could not remove');
     case 'opensv':return guard(()=>openSv(b.dataset.id),'Could not open');
     case 'clone':case 'clonehint':return guard(async()=>{
       const s=A.sv,qs=deepCopy(s.questions);
@@ -772,6 +793,7 @@ document.addEventListener('change',e=>{const t=e.target;if(!root()||!root().cont
   if(t.id==='fk'){A.filt.kind=t.value;paint();return}if(t.id==='ft'){A.filt.tag=t.value;paint();return}
   if(t.id==='st'){A.form.name=$('svName').value;A.form.tag=t.value;paint();return}
   if(t.dataset.f){const g=(A.groups[A.tabQ]||[]).find(x=>x.id===Number(t.dataset.id));if(g){g[t.dataset.f]=t.value;saveGroupsSoon()}return}
+  if(t.dataset.a==='teamrole'){const em=t.dataset.e,role=t.value;guard(async()=>{await Cloud.saveTeam(em,role);A.team=await Cloud.listTeam();A.status=em+' is now '+role+'.';paint()},'Could not change role');return}
   if(t.dataset.a==='pts'){A.pts=t.value;persistA();saveGroupsSoon();paint();return}
   if(t.dataset.a==='teamname'){S.teams[t.dataset.t].name=t.value.trim()||('Team '+t.dataset.t);render();return}});
 document.addEventListener('keydown',e=>{const r=root();if(!r||r.classList.contains('hidden'))return;
