@@ -271,7 +271,8 @@ function memImpl(){
     async countAnswers(code,q){return Object.values(db.answers[code]||{}).filter(a=>a.q===q).length},
     async getAnswers(code){const out={};Object.values(db.answers[code]||{}).forEach(a=>(out[a.q]=out[a.q]||[]).push(a.a));return out},
     // practice helper: a simulated phone submitting an answer (mirrors the Firestore rules)
-    async _submit(code,u,q,a){const l=db.live[code];if(!l||l.phase!=='open'||l.q!==q||!a||a.length>80)return false;(db.answers[code]=db.answers[code]||{})[u+'_'+q]={uid:u,q:q,a:a};save();return true}
+    async _submit(code,u,q,a){const l=db.live[code];if(!l||l.phase!=='open'||l.q!==q||!a||a.length>80)return false;(db.answers[code]=db.answers[code]||{})[u+'_'+q]={uid:u,q:q,a:a,t:Date.now()+(db._seq=((db._seq||0)+1)%1000)/1000};save();return true},
+    async getBuzzes(code,q){return Object.values(db.answers[code]||{}).filter(a=>a.q===q).sort((x,y)=>(x.t||0)-(y.t||0)).map(a=>({uid:a.uid,a:a.a,t:a.t||0}))}
   };
 }
 
@@ -314,6 +315,8 @@ async function fbImpl(cfg){
       for(let i=0;i<s.docs.length;i+=400){const b=F.writeBatch(db);s.docs.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit()}
       await F.deleteDoc(F.doc(db,'live',code))}catch(e){}},
     async countAnswers(code,q){const r=await F.getCountFromServer(F.query(F.collection(db,'live',code,'answers'),F.where('q','==',q)));return r.data().count},
+    async getBuzzes(code,q){const s=await F.getDocs(F.query(F.collection(db,'live',code,'answers'),F.where('q','==',q)));
+      return s.docs.map(d=>{const x=d.data();return{uid:x.uid,a:x.a,t:x.t&&x.t.toMillis?x.t.toMillis():0}}).sort((a,b)=>a.t-b.t)},
     async getAnswers(code){const s=await F.getDocs(F.collection(db,'live',code,'answers')),out={};
       s.docs.forEach(d=>{const x=d.data();(out[x.q]=out[x.q]||[]).push(x.a)});return out}
   };
@@ -346,7 +349,10 @@ window.Cloud=Cloud;
 'use strict';
 var G={};window.GAMES=G;
 G.order=[];
-G.register=function(g){G[g.id]=g;if(G.order.indexOf(g.id)<0)G.order.push(g.id)};
+G.adapters={};
+G.register=function(g){G[g.id]=g;if(G.order.indexOf(g.id)<0)G.order.push(g.id);if(g.toCommon)G.adapters[g.id]={toCommon:g.toCommon,fromCommon:g.fromCommon}};
+/* Transfer between shows: item -> common {text,answer,answers,hint,category,pts,tags,source} -> item of the other show */
+G.convert=function(item,from,to){var a=G.adapters[from],b=G.adapters[to];if(!a||!b)return null;var c=a.toCommon(item),o=b.fromCommon(c);o.tags=(c.tags||[]).slice();return o};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 G.esc=esc;
 var clone=function(o){return JSON.parse(JSON.stringify(o))};
@@ -404,6 +410,9 @@ G.register({
     {k:'source',label:'Source note',t:'text',full:1},
     {k:'tags',label:'Sets / tags (comma separated)',t:'tags',full:1}],
   defaults:{kind:'clue',pts:100},
+  toCommon:function(q){return{text:q.en,answer:q.answer||'',answers:[],hint:'',category:q.category||'',pts:q.pts||100,tags:q.tags||[],source:q.source||''}},
+  fromCommon:function(c){var ans=c.answer||(c.answers&&c.answers.length?c.answers.slice(0,3).map(function(a){return a.en}).join(' / '):'');
+    return{game:'jeopardy',kind:'clue',en:c.text&&c.text.trim()?c.text:(c.hint?'Name the bhajan that begins: '+c.hint:'Name this bhajan.'),answer:ans,category:c.category||'General',pts:c.pts||100,source:c.source||''}},
   row:function(q){return{a:q.en,b:(q.category||'')+(q.kind==='clue'?' · '+q.pts:''),chip:q.kind==='clue'?'Clue':q.kind==='final'?'Final':'Lightning'}},
   summary:function(items){var c={};items.forEach(function(q){c[q.kind||'clue']=(c[q.kind||'clue']||0)+1});return (c.clue||0)+' board clues · '+(c.lightning||0)+' lightning · '+(c.final||0)+' final'},
   validate:function(items){return items.some(function(q){return (q.kind||'clue')==='clue'})?'':'A Jeopardy session needs at least one board clue.'},
@@ -414,7 +423,7 @@ G.register({
     var fin=items.filter(function(q){return q.kind==='final'})[0];
     return{game:'jeopardy',teams:mkTeams(4),cats:cats,final:fin?{cat:fin.category||'Final',q:fin.en,a:fin.answer||'',src:fin.source||''}:null,
       lightning:items.filter(function(q){return q.kind==='lightning'}).map(function(q){return{q:q.en,a:q.answer||'',src:q.source||'',used:false}}),
-      view:'board',cur:null,timerSecs:0,timerEndsAt:0,fin:{step:0,wagers:[],res:[]},lg:{i:-1,reveal:false},lpts:1}},
+      view:'board',cur:null,timerSecs:0,timerEndsAt:0,fin:{step:0,wagers:[],res:[]},lg:{i:-1,reveal:false},lpts:1,buzz:{on:false,secs:10,q:0,open:false,closesAt:0}}},
   act:function(S,a,d){
     var cl=S.cur?S.cats[S.cur.c].clues[S.cur.i]:null;
     if(timerAct(S,a,d))return S;
@@ -422,14 +431,19 @@ G.register({
       case 'nteams':setTeams(S,d.v);break;
       case 'tname':S.teams[+d.i].name=String(d.v||'').trim()||('Team '+(+d.i+1));break;
       case 'adj':S.teams[+d.i].score+=+d.v;break;
-      case 'open':S.cur={c:+d.c,i:+d.i,reveal:false,dd:false,wager:0};S.view='clue';S.timerEndsAt=0;S.timerSecs=0;break;
+      case 'open':S.cur={c:+d.c,i:+d.i,reveal:false,dd:false,wager:0,locked:[],buzzTeam:null};S.view='clue';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false;break;
       case 'reveal':if(S.cur)S.cur.reveal=true;break;
       case 'dd':if(S.cur){S.cur.dd=!S.cur.dd;S.cur.wager=S.cur.dd?cl.pts:0}break;
       case 'wager':if(S.cur)S.cur.wager=Math.max(0,+d.v||0);break;
-      case 'right':if(cl){S.teams[+d.i].score+=S.cur.dd?S.cur.wager:cl.pts;cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0}break;
-      case 'wrong':if(cl){S.teams[+d.i].score-=S.cur.dd?S.cur.wager:cl.pts;if(S.cur.dd){cl.used=true;S.cur=null;S.view='board'}}break;
-      case 'close':if(cl){cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0}break;
-      case 'back':S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;break;
+      case 'right':if(cl){S.teams[+d.i].score+=S.cur.dd?S.cur.wager:cl.pts;cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false}break;
+      case 'wrong':if(cl){S.teams[+d.i].score-=S.cur.dd?S.cur.wager:cl.pts;if(S.cur.dd){cl.used=true;S.cur=null;S.view='board'}else{var wi=+d.i;if(S.cur.locked.indexOf(wi)<0)S.cur.locked.push(wi);S.cur.buzzTeam=null}}break;
+      case 'close':if(cl){cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false}break;
+      case 'back':S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false;break;
+      case 'bzon':S.buzz.on=!S.buzz.on;if(!S.buzz.on)S.buzz.open=false;break;
+      case 'bzsecs':S.buzz.secs=Math.max(2,Math.min(120,+d.v||10));break;
+      case 'bzopened':S.buzz.q=+d.q;S.buzz.open=true;S.buzz.closesAt=+d.closesAt;if(S.cur)S.cur.buzzTeam=null;break;
+      case 'bzclosed':S.buzz.open=false;if(S.cur&&d.team!==undefined&&d.team!==''&&d.team!==null&&+d.team>=0)S.cur.buzzTeam=+d.team;break;
+      case 'bzset':if(S.cur)S.cur.buzzTeam=(d.v===''||d.v==null)?null:+d.v;break;
       case 'final':if(S.final){S.view='final';S.fin={step:0,wagers:S.teams.map(function(){return 0}),res:S.teams.map(function(){return null})}}break;
       case 'fstep':S.fin.step=Math.min(3,S.fin.step+1);break;
       case 'fwager':S.fin.wagers[+d.i]=Math.max(0,+d.v||0);break;
@@ -451,13 +465,16 @@ G.register({
       h+='<div class="gm-cat">Pick a clue</div><div class="gm-grid" style="grid-template-columns:repeat('+Math.max(1,S.cats.length)+',1fr)">'+
         S.cats.map(function(c){return '<div class="gm-head">'+esc(c.name)+'</div>'}).join('')+
         Array.from({length:rows},function(_,r){return S.cats.map(function(c,ci){var k=c.clues[r];return k?(k.used?'<div class="gm-cell used">·</div>':btn(g,'open',k.pts,' data-c="'+ci+'" data-i="'+r+'"','gm-cell')):'<div></div>'}).join('')}).join('')+'</div>'+
-        '<div class="gm-row">'+(S.lightning.length?btn(g,'lightning','⚡ Lightning round ('+S.lightning.length+')'):'')+(S.final?btn(g,'final','🏁 Final clue','','gold'):'')+btn(g,'done','Finish game &amp; show winner','','grn')+'</div>';
+        '<div class="gm-row">'+btn(g,'bzon',S.buzz.on?'📱 Phone buzzers: ON':'📱 Phone buzzers: off','',S.buzz.on?'grn':'')+(S.buzz.on?'<label>Buzz window <input type="number" min="2" max="120" data-gi="'+g+'" data-act="bzsecs" value="'+S.buzz.secs+'" style="width:60px"> s</label>':'')+(S.lightning.length?btn(g,'lightning','⚡ Lightning round ('+S.lightning.length+')'):'')+(S.final?btn(g,'final','🏁 Final clue','','gold'):'')+btn(g,'done','Finish game &amp; show winner','','grn')+'</div>';
     }else if(S.view==='clue'&&S.cur){
       var c=S.cats[S.cur.c],k=c.clues[S.cur.i];
-      h+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">Source: '+esc(k.src)+'</div>':'')+
+      var bz='';if(S.buzz.on){var bt=S.cur.buzzTeam;bz='<div class="gm-sec"><div class="gm-cat">📱 Phone buzzers</div><div class="gm-row">'+btn(g,'bzopen','🔔 Open buzzers ('+S.buzz.secs+'s)','','gold')+btn(g,'bzlock','Lock now')+
+        '<label>Buzzed first <select data-gi="'+g+'" data-act="bzset"><option value="">—</option>'+S.teams.map(function(t,i){return '<option value="'+i+'"'+(bt===i?' selected':'')+(S.cur.locked.indexOf(i)>=0?' disabled':'')+'>'+esc(t.name)+'</option>'}).join('')+'</select></label></div>'+
+        '<div class="gm-note">'+(S.buzz.open?'Buzzers are OPEN — first phone to buzz wins.':bt!=null?esc(S.teams[bt].name)+' buzzed first.':'Buzzers closed.')+(S.cur.locked.length?' Locked out: '+S.cur.locked.map(function(i){return esc(S.teams[i].name)}).join(', ')+'.':'')+'</div></div>'}
+      h+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">Source: '+esc(k.src)+'</div>':'')+bz+
         '<div class="gm-row">'+btn(g,'reveal',S.cur.reveal?'Answer shown on screen ✓':'Show answer on the big screen',S.cur.reveal?' disabled':'')+btn(g,'dd',S.cur.dd?'Daily Double ON':'Daily Double?','', S.cur.dd?'gold':'')+(S.cur.dd?'<label>Wager <input type="number" min="0" data-gi="'+g+'" data-act="wager" value="'+S.cur.wager+'" style="width:90px"></label>':'')+'</div>'+timerBtns(g,S)+
-        '<div class="gm-note">Correct answer: who gets the points?</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'right','✓ '+esc(t.name),' data-i="'+i+'"','grn')}).join('')+'</div>'+
-        '<div class="gm-note">Wrong answer (deducts points, clue stays open):</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'wrong','✗ '+esc(t.name),' data-i="'+i+'"','red')}).join('')+'</div>'+
+        '<div class="gm-note">Correct answer: who gets the points?</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'right','✓ '+esc(t.name)+(S.cur.buzzTeam===i?' 🔔':''),' data-i="'+i+'"','grn')}).join('')+'</div>'+
+        '<div class="gm-note">Wrong answer (deducts points, clue stays open):</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'wrong','✗ '+esc(t.name)+(S.cur.buzzTeam===i?' 🔔':''),' data-i="'+i+'"','red')}).join('')+'</div>'+
         '<div class="gm-row">'+btn(g,'close','No one got it — close clue')+btn(g,'back','← Back to board (keep clue)')+'</div></div>';
     }else if(S.view==='final'){
       h+='<div class="gm-sec"><div class="gm-cat">Final clue · '+esc(S.final.cat)+'</div>'+
@@ -474,7 +491,7 @@ G.register({
   host:function(S){
     var g='<div class="gm">'+teamBoard(S.teams,-1);
     if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];
-      g+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE (wager '+S.cur.wager+')':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">'+esc(k.src)+'</div>':'')+(S.cur.reveal?'<div class="gm-note">Answer is showing on the big screen.</div>':'')+'</div>'}
+      g+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE (wager '+S.cur.wager+')':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">'+esc(k.src)+'</div>':'')+(S.cur.reveal?'<div class="gm-note">Answer is showing on the big screen.</div>':'')+(S.buzz.on?'<div class="gm-note">🔔 '+(S.buzz.open?'Buzzers open':S.cur.buzzTeam!=null?esc(S.teams[S.cur.buzzTeam].name)+' buzzed first':'Buzzers closed')+'</div>':'')+'</div>'}
     else if(S.view==='final'){g+='<div class="gm-sec"><div class="gm-cat">Final clue · '+esc(S.final.cat)+' · step '+S.fin.step+'/3</div><div class="gm-q">'+esc(S.final.q)+'</div><div class="gm-a">Answer: '+esc(S.final.a)+'</div></div>'}
     else if(S.view==='lightning'){var L=S.lightning[S.lg.i];g+='<div class="gm-sec"><div class="gm-cat">Lightning · '+(S.lg.i+1)+'/'+S.lightning.length+'</div><div class="gm-q">'+esc(L.q)+'</div><div class="gm-a">Answer: '+esc(L.a)+'</div></div>'}
     else if(S.view==='done'){var w=leader(S.teams);g+='<div class="gm-win"><div>FINAL</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2></div>'}
@@ -485,13 +502,13 @@ G.register({
     var D={game:'jeopardy',title:sv&&sv.name||'',view:S.view,teams:S.teams.map(function(t){return{name:t.name,score:t.score}}),
       cats:S.cats.map(function(c){return{name:c.name,clues:c.clues.map(function(k){return{pts:k.pts,used:k.used}})}}),
       timerSecs:S.timerSecs||0,timerEndsAt:S.timerEndsAt||0,updatedAt:Date.now()};
-    if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];D.cur={cat:c.name,pts:k.pts,q:k.q,a:S.cur.reveal?k.a:null,dd:S.cur.dd,wager:S.cur.dd?S.cur.wager:0}}
+    if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];D.cur={cat:c.name,pts:k.pts,q:k.q,a:S.cur.reveal?k.a:null,dd:S.cur.dd,wager:S.cur.dd?S.cur.wager:0};if(S.buzz.on)D.buzz={open:S.buzz.open,closesAt:S.buzz.closesAt,secs:S.buzz.secs,team:S.cur.buzzTeam!=null?S.teams[S.cur.buzzTeam].name:null,locked:S.cur.locked.map(function(i){return S.teams[i].name})}}
     if(S.view==='final'&&S.final)D.final={cat:S.final.cat,q:S.fin.step>=2?S.final.q:null,a:S.fin.step>=3?S.final.a:null,step:S.fin.step};
     if(S.view==='lightning'){var L=S.lightning[S.lg.i];D.lg={n:S.lg.i+1,of:S.lightning.length,q:L.q,a:S.lg.reveal?L.a:null}}
     return D},
   display:function(D){
     var h='<div class="gm gm-big">'+teamBoard(D.teams,-1,true);
-    if(D.view==='clue'&&D.cur){var c=D.cur;h+='<div class="gm-cat" style="text-align:center">'+esc(c.cat)+' · '+c.pts+(c.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(c.q)+'</div>'+(c.a?'<div class="gm-a">'+esc(c.a)+'</div>':'')+'<div style="text-align:center">'+timerHtml(D)+'</div>'}
+    if(D.view==='clue'&&D.cur){var c=D.cur;h+='<div class="gm-cat" style="text-align:center">'+esc(c.cat)+' · '+c.pts+(c.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(c.q)+'</div>'+(D.buzz&&D.buzz.open?'<div class="gm-warn" style="text-align:center;font-size:clamp(18px,2.6vw,40px)">🔔 BUZZERS OPEN <span class="gm-timer" data-end="'+D.buzz.closesAt+'" data-secs="'+D.buzz.secs+'">'+D.buzz.secs+'s</span></div>':D.buzz&&D.buzz.team?'<div class="gm-a" style="text-align:center">🔔 '+esc(D.buzz.team)+' buzzed in first!</div>':'')+(c.a?'<div class="gm-a">'+esc(c.a)+'</div>':'')+'<div style="text-align:center">'+timerHtml(D)+'</div>'}
     else if(D.view==='final'&&D.final){var f=D.final;h+='<div class="gm-cat" style="text-align:center">Final clue</div><div class="gm-q">'+esc(f.cat)+'</div>'+(f.q?'<div class="gm-q" style="font-size:clamp(20px,3vw,44px)">'+esc(f.q)+'</div>':'')+(f.a?'<div class="gm-a">'+esc(f.a)+'</div>':'')}
     else if(D.view==='lightning'&&D.lg){h+='<div class="gm-cat" style="text-align:center">Lightning round · '+D.lg.n+' of '+D.lg.of+'</div><div class="gm-q">'+esc(D.lg.q)+'</div>'+(D.lg.a?'<div class="gm-a">'+esc(D.lg.a)+'</div>':'')}
     else if(D.view==='done'){var w=leader(D.teams);h+='<div class="gm-win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2></div>'}
@@ -516,6 +533,8 @@ G.register({
     {k:'category',label:'Deity / theme (optional)',t:'text'},
     {k:'tags',label:'Sets / tags (comma separated)',t:'tags',full:1}],
   defaults:{kind:'bhajan'},
+  toCommon:function(q){return{text:'',answer:q.en,answers:[],hint:q.hint||'',category:q.category||'',pts:0,tags:q.tags||[],source:''}},
+  fromCommon:function(c){return{game:'antakshari',kind:'bhajan',en:(c.answer||c.text||'').trim(),hint:c.hint||'',category:c.category||''}},
   row:function(q){return{a:q.en,b:q.hint||q.category||'',chip:'Bhajan'}},
   summary:function(items){return items.length+' bhajans in the helper list (teams may sing any bhajan)'},
   validate:function(){return ''},
@@ -770,10 +789,10 @@ function vBank(){
   const have=new Set(A.bank.map(q=>q.en)),newSeed=(window.SEED_QUESTIONS||[]).filter(q=>!have.has(q.en)).length;
   return`<div class="r0-card"><div class="a-filter"><input id="fq" placeholder="Search questions…" value="${esc(f.q)}"><select id="fk"><option value="">All types</option><option value="round" ${f.kind==='round'?'selected':''}>Main rounds</option><option value="fast" ${f.kind==='fast'?'selected':''}>Fast Money</option></select>
    <select id="ft"><option value="">All sets</option>${tags.map(t=>`<option ${f.tag===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
-   <button class="btn gold" data-a="newq">+ Add question</button>${newSeed?`<button class="btn" data-a="seed">Add ${newSeed} starter questions</button>`:''}</div>
+   <button class="btn gold" data-a="newq">+ Add question</button>${f.tag?`<select class="a-copy" data-copyset="1" data-from="feud">${copyOpts('feud').replace('Copy to…','Copy all '+list.filter(q=>(q.tags||[]).includes(f.tag)).length+' in this set to…')}</select>`:''}${newSeed?`<button class="btn" data-a="seed">Add ${newSeed} starter questions</button>`:''}</div>
   <div class="r0-tablewrap"><table class="r0-table"><thead><tr><th>Type</th><th>Question</th><th>Category</th><th>Sets</th><th></th></tr></thead><tbody>
   ${list.map(q=>`<tr><td><span class="r0-chip ${q.kind==='fast'?'warn':''}">${q.kind==='fast'?'Fast':'Round'}</span></td><td>${esc(q.en)}${q.optional?' <span class="r0-chip">factual</span>':''}</td><td>${esc(q.category||'')}</td><td class="vs">${(q.tags||[]).map(t=>`<span class="r0-v">${esc(t)}</span>`).join('')}</td>
-   <td><button class="btn small" data-a="editq" data-id="${q.id}">Edit</button> <button class="btn small red" data-a="delq" data-id="${q.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan="5">No questions match. Add one, or load the starter set.</td></tr>'}</tbody></table></div></div>`}
+   <td><button class="btn small" data-a="editq" data-id="${q.id}">Edit</button> <button class="btn small red" data-a="delq" data-id="${q.id}">Delete</button> <select class="a-copy" data-copy="${q.id}" data-from="feud">${copyOpts('feud')}</select></td></tr>`).join('')||'<tr><td colspan="5">No questions match. Add one, or load the starter set.</td></tr>'}</tbody></table></div></div>`}
 function vQForm(){const q=A.qf;return`<div class="r0-wrap">${bar()}<div class="r0-card"><h1>${q.id?'Edit question':'Add a question'}</h1>
  <div class="a-form">
   <label class="full">Question<textarea id="qEn" rows="2">${esc(q.en)}</textarea></label>
@@ -855,15 +874,58 @@ function vGate(){return`<div class="r0-wrap">${bar()}<div class="r0-gate"><div c
 const gOthers=()=>(window.GAMES?GAMES.order.filter(id=>id!=='feud'):[]);
 const gCount=id=>A.gbank.filter(q=>q.game===id).length;
 const clone=o=>JSON.parse(JSON.stringify(o));
+/* ---------- transfer questions between shows ---------- */
+if(window.GAMES&&GAMES.adapters){GAMES.adapters.feud={
+  toCommon:q=>({text:q.en,answer:(q.answers&&q.answers[0]&&q.answers[0].en)||'',answers:(q.answers||[]).map(x=>({en:x.en,count:x.count})),hint:'',category:q.category||'',pts:100,tags:q.tags||[],source:''}),
+  fromCommon:c=>{const has=c.answers&&c.answers.length;return{kind:'round',en:c.text||c.answer,category:c.category||'',title:'',multiplier:1,source:'discourse',optional:!!c.answer&&!has,cue:c.answer&&!has?'Known answer: '+c.answer:'',answers:(c.answers||[]).map(x=>({en:x.en,es:x.en,count:x.count||10}))}}}}
+const showName=id=>id==='feud'?'🎤 Feud':GAMES[id].icon+' '+GAMES[id].label;
+const showIds=()=>['feud',...gOthers()];
+const itemsOf=id=>id==='feud'?A.bank:A.gbank.filter(q=>q.game===id);
+const copyOpts=from=>'<option value="">Copy to…</option>'+showIds().filter(s=>s!==from).map(s=>`<option value="${s}">${esc(showName(s))}</option>`).join('');
+async function copyItems(src,from,to){let n=0,skip=0;const have=new Set(itemsOf(to).map(q=>q.en));
+  for(const it of src){if(!it)continue;const o=GAMES.convert(it,from,to);if(!o||!o.en){skip++;continue}
+    if(have.has(o.en)){skip++;continue}
+    if(to==='feud')delete o.game;else{o.game=to;o.kind=o.kind||GAMES[to].defaults.kind}
+    o.tags=[...(o.tags||[]),'Copied from '+showName(from).replace(/^\S+\s/,'')];await Cloud.saveQuestion(o);have.add(o.en);n++}
+  await loadAll();A.status='Copied '+n+' item'+(n===1?'':'s')+' to '+showName(to).replace(/^\S+\s/,'')+(skip?' ('+skip+' skipped: already there or empty)':'')+'.';paint()}
+/* ---------- phone buzzer for Jeopardy (timers set per game) ---------- */
+let bzT=null,bzBusy=false;
+const bzLive=(S,sv,extra)=>Object.assign({surveyId:sv.id,mode:'buzzer',phase:'idle',q:S.buzz.q,teams:S.teams.map(t=>t.name),locked:S.cur?S.cur.locked:[],winner:-1,closesAt:0,seconds:S.buzz.secs,hostNow:Date.now(),question:null,total:0},extra||{});
+async function bzStart(){await Cloud.liveSet(A.sv.code,bzLive(A.gs.S,A.sv))}
+async function bzStop(){clearInterval(bzT);try{await Cloud.liveUpdate(A.sv.code,{mode:'off',phase:'idle'})}catch(e){}}
+async function bzIdle(manual){const S=A.gs.S;clearInterval(bzT);S.buzz.open=false;
+  try{await Cloud.liveUpdate(A.sv.code,{mode:'buzzer',phase:manual?'locked':'idle',winner:manual&&S.cur&&S.cur.buzzTeam!=null?S.cur.buzzTeam:-1,locked:S.cur?S.cur.locked:[],teams:S.teams.map(t=>t.name),hostNow:Date.now()})}catch(e){}}
+async function bzOpen(){const S=A.gs.S,sv=A.sv;if(!S.cur)return;if(S.cur.locked.length>=S.teams.length){await bzIdle();return}
+  const q=S.buzz.q+1,closes=Date.now()+S.buzz.secs*1000;S.cur.buzzTeam=null;S.buzz.q=q;S.buzz.open=true;S.buzz.closesAt=closes;
+  await Cloud.liveSet(sv.code,bzLive(S,sv,{phase:'open',q,closesAt:closes}));
+  clearInterval(bzT);bzT=setInterval(bzPoll,600)}
+async function bzClose(team){const S=A.gs&&A.gs.S;if(!S)return;clearInterval(bzT);S.buzz.open=false;if(S.cur&&team!=null)S.cur.buzzTeam=team;
+  try{await Cloud.liveUpdate(A.sv.code,{phase:'locked',winner:team==null?-1:team,hostNow:Date.now()})}catch(e){}gSync();paint()}
+async function bzPoll(){if(bzBusy)return;const S=A.gs&&A.gs.S;if(!S||!S.buzz.open||A.stage!=='gplay'){clearInterval(bzT);return}
+  bzBusy=true;try{let list=[];try{list=await Cloud.getBuzzes(A.sv.code,S.buzz.q)}catch(e){}
+    list=list.filter(x=>{const t=parseInt(x.a,10);return !isNaN(t)&&t<S.teams.length&&S.cur&&S.cur.locked.indexOf(t)<0});
+    if(S.buzz.open){if(list.length)await bzClose(parseInt(list[0].a,10));else if(Date.now()>S.buzz.closesAt+400)await bzClose(null)}}finally{bzBusy=false}}
+async function gAct(gid,d){const g=GAMES[gid],S=A.gs.S;
+  if(gid==='jeopardy'&&d.act==='bzopen'){await bzOpen();gSync();paint();return}
+  if(gid==='jeopardy'&&d.act==='bzlock'){await bzClose(null);return}
+  g.act(S,d.act,d);
+  if(gid==='jeopardy'){
+    if(d.act==='bzon'){if(S.buzz.on)await bzStart();else await bzStop()}
+    else if(S.buzz.on){
+      if(['right','close','back','open'].includes(d.act))await bzIdle();
+      else if(d.act==='wrong'&&S.view==='clue')await bzOpen();
+      else if(d.act==='bzset')await bzIdle(true)}}
+  gSync();paint()}
+
 function vGTab(id){
   const g=GAMES[id];if(!g)return '';const f=A.gfilt,items=A.gbank.filter(q=>q.game===id),tags=[...new Set(items.flatMap(q=>q.tags||[]))].sort();
   const list=items.filter(q=>(!f.tag||(q.tags||[]).includes(f.tag))&&(!f.q||(q.en+' '+(q.category||'')).toLowerCase().includes(f.q.toLowerCase())));
   const seeds=(window.GAME_SEEDS&&GAME_SEEDS[id])||[],have=new Set(items.map(q=>q.en)),newSeed=seeds.filter(q=>!have.has(q.en)).length;
   return`<div class="r0-card"><div class="a-filter"><input id="gq" placeholder="Search…" value="${esc(f.q)}"><select id="gt"><option value="">All sets</option>${tags.map(t=>`<option ${f.tag===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
-   <button class="btn gold" data-a="gnewitem" data-game="${id}">+ Add ${g.itemLabel}</button>${newSeed?`<button class="btn" data-a="gseed" data-game="${id}">Add ${newSeed} starter ${g.itemLabel}s</button>`:''}</div>
+   <button class="btn gold" data-a="gnewitem" data-game="${id}">+ Add ${g.itemLabel}</button>${f.tag?`<select class="a-copy" data-copyset="1" data-from="${id}">${copyOpts(id).replace('Copy to…','Copy all '+list.length+' in this set to…')}</select>`:''}${newSeed?`<button class="btn" data-a="gseed" data-game="${id}">Add ${newSeed} starter ${g.itemLabel}s</button>`:''}</div>
   <div class="r0-tablewrap"><table class="r0-table"><thead><tr><th>Type</th><th>${esc(g.itemLabel)}</th><th>Details</th><th>Sets</th><th></th></tr></thead><tbody>
   ${list.map(q=>{const r=g.row(q);return`<tr><td><span class="r0-chip">${esc(r.chip)}</span></td><td>${esc(r.a)}</td><td>${esc(r.b)}</td><td class="vs">${(q.tags||[]).map(t=>`<span class="r0-v">${esc(t)}</span>`).join('')}</td>
-   <td><button class="btn small" data-a="geditq" data-id="${q.id}">Edit</button> <button class="btn small red" data-a="gdelq" data-id="${q.id}">Delete</button></td></tr>`}).join('')||'<tr><td colspan="5">Nothing here yet. Add one, or load the starter content.</td></tr>'}</tbody></table></div></div>`}
+   <td><button class="btn small" data-a="geditq" data-id="${q.id}">Edit</button> <button class="btn small red" data-a="gdelq" data-id="${q.id}">Delete</button> <select class="a-copy" data-copy="${q.id}" data-from="${id}">${copyOpts(id)}</select></td></tr>`}).join('')||'<tr><td colspan="5">Nothing here yet. Add one, or load the starter content.</td></tr>'}</tbody></table></div></div>`}
 function vGItem(){const q=A.gf,g=GAMES[q.game];
   return`<div class="r0-wrap">${bar()}<div class="r0-card"><h1>${q.id?'Edit':'Add'} ${esc(g.itemLabel)}</h1><div class="a-form">${g.fields.map(fd=>{
     const v=fd.t==='tags'?(q.tags||[]).join(', '):(q[fd.k]!=null?q[fd.k]:'');let ctl;
@@ -928,7 +990,7 @@ async function guard(fn,msg){if(A.busy)return;A.busy=true;try{await fn()}catch(e
 
 /* ================= data loading ================= */
 async function loadAll(){const sv=await Cloud.listSurveys(),bk=await Cloud.listQuestions();A.surveys=sv.filter(s=>!s.game||s.game==='feud');A.gsurveys=sv.filter(s=>s.game&&s.game!=='feud');A.bank=bk.filter(q=>!q.game||q.game==='feud');A.gbank=bk.filter(q=>q.game&&q.game!=='feud');if(isAdmin()){try{A.team=await Cloud.listTeam()}catch(e){A.team=[]}}}
-async function goDash(){if(A.gs)gSync(true);A.gs=null;await loadAll();A.stage='dash';A.sv=null;persistA();paint()}
+async function goDash(){if(A.gs)gSync(true);A.gs=null;clearInterval(bzT);await loadAll();A.stage='dash';A.sv=null;persistA();paint()}
 async function onUser(u){
   if(!u){A.user=null;A.stage='login';paint();return}
   const role=await Cloud.getRole(u);
@@ -1126,12 +1188,15 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('click',e=>{const b=e.target.closest('[data-g]');if(!b||!root()||!root().contains(b)||!A.gs||A.stage!=='gplay')return;
   const d=Object.assign({},b.dataset);if(d.from){const el=$(d.from);d.title=el?el.value:''}
-  const g=GAMES[b.dataset.g];if(!g)return;g.act(A.gs.S,d.act,d);gSync();paint()});
+  if(!GAMES[b.dataset.g])return;gAct(b.dataset.g,d)});
 document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.gi||!A.gs||A.stage!=='gplay'||!root().contains(t))return;
-  const g=GAMES[t.dataset.gi];if(!g)return;g.act(A.gs.S,t.dataset.act,Object.assign({},t.dataset,{v:t.value}));gSync();paint()});
+  if(!GAMES[t.dataset.gi])return;gAct(t.dataset.gi,Object.assign({},t.dataset,{v:t.value}))});
 document.addEventListener('input',e=>{const t=e.target;if(!root()||!root().contains(t))return;
   if(t.id==='fq'){A.filt.q=t.value;paint()}else if(t.id==='sq'){A.form.name=$('svName').value;A.form.q=t.value;paint()}else if(t.id==='gq'){A.gfilt.q=t.value;paint()}else if(t.id==='gsq'){A.gform.name=$('gName').value;A.gform.q=t.value;paint()}});
 document.addEventListener('change',e=>{const t=e.target;if(!root()||!root().contains(t))return;
+  if(t.classList&&t.classList.contains('a-copy')){const to=t.value,from=t.dataset.from;if(!to)return;
+    const src=t.dataset.copy?[itemsOf(from).find(q=>q.id===t.dataset.copy)]:(from==='feud'?itemsOf('feud').filter(q=>(q.tags||[]).includes(A.filt.tag)):itemsOf(from).filter(q=>(q.tags||[]).includes(A.gfilt.tag)));
+    t.value='';guard(()=>copyItems(src,from,to),'Could not copy');return}
   if(t.id==='fk'){A.filt.kind=t.value;paint();return}if(t.id==='ft'){A.filt.tag=t.value;paint();return}
   if(t.id==='st'){A.form.name=$('svName').value;A.form.tag=t.value;paint();return}
   if(t.id==='gt'){A.gfilt.tag=t.value;paint();return}

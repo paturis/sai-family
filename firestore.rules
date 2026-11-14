@@ -68,7 +68,8 @@ service cloud.firestore {
       match /answers/{aid} {
         allow read, delete: if isStaff();
         allow create, update: if request.auth != null
-          && request.resource.data.keys().hasOnly(['uid', 'q', 'a'])
+          && request.resource.data.keys().hasOnly(['uid', 'q', 'a', 't'])
+          && (!('t' in request.resource.data) || request.resource.data.t == request.time)
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.q is int
           && aid == request.auth.uid + '_' + string(request.resource.data.q)

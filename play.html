@@ -60,9 +60,27 @@ function askCode(msg){
   document.getElementById('codeIn').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('codeGo').click()});
 }
 
+/* ---------- buzzer mode (Jeopardy): pick your team, then hit BUZZ when the host opens the buzzers ---------- */
+var bz={team:null,pressed:{}};try{bz.team=localStorage.getItem('buzzTeam_'+code)}catch(e){}
+function renderBuzzer(){
+  var teams=st.teams||[];
+  if(bz.team===null||bz.team===''||isNaN(+bz.team)||+bz.team>=teams.length){
+    view.innerHTML='<div class="card"><div class="pill">BUZZER</div><p class="q">Which team are you on?</p>'+teams.map(function(n,i){return '<button class="go" data-t="'+i+'">'+esc(n)+'</button>'}).join('')+'</div>';
+    [].forEach.call(view.querySelectorAll('[data-t]'),function(b){b.onclick=function(){bz.team=b.getAttribute('data-t');try{localStorage.setItem('buzzTeam_'+code,bz.team)}catch(e){}render()}});return}
+  var me=+bz.team,locked=(st.locked||[]).indexOf(me)>=0,open=st.phase==='open'&&!locked&&!bz.pressed[st.q];
+  var head='<div class="pill">TEAM · '+esc(teams[me])+'</div>';
+  if(st.phase==='open'&&bz.pressed[st.q])view.innerHTML='<div class="card msg">'+head+'<div class="big">🔔</div><h2>Buzzed!</h2><p>Waiting to see who was first…</p></div>';
+  else if(open)view.innerHTML='<div class="card msg">'+head+'<button id="buzz" style="font-size:44px;padding:60px 10px;background:#c0392b;color:#fff;border-radius:24px;margin-top:10px">BUZZ!</button><div class="timer" style="margin-top:14px"><i id="tbar"></i></div></div>';
+  else if(st.phase==='locked'){var w=st.winner;view.innerHTML='<div class="card msg">'+head+'<div class="big">'+(w===me?'🏆':'⏳')+'</div><h2>'+(w==null||w<0?'No one buzzed':(w===me?'You buzzed first!':esc(teams[w])+' buzzed first'))+'</h2></div>'}
+  else if(locked)view.innerHTML='<div class="card msg">'+head+'<div class="big">🔒</div><h2>Your team is locked out</h2><p>Another team may answer.</p></div>';
+  else view.innerHTML='<div class="card msg">'+head+'<div class="big">🎯</div><h2>Get ready</h2><p>The buzzers open after the host reads the clue.</p></div>';
+  var bb=document.getElementById('buzz');if(bb){var fire=function(e){e.preventDefault();var q=st.q;if(bz.pressed[q])return;bz.pressed[q]=true;
+      (backend.buzz||backend.submit)(code,q,me+'|'+(teams[me]||'')).then(function(){render()},function(){bz.pressed[q]=false;alert('Could not buzz — try again.')});render()};
+    bb.addEventListener('pointerdown',fire);bb.addEventListener('click',fire)}}
 function render(){
   if(!st){view.innerHTML=card('🕉️','Connecting…');return}
   if(st.missing){askCode('That code was not found. Please check the screen and try again.');return}
+  if(st.mode==='buzzer'){renderBuzzer();return}
   var key=st.phase+'|'+st.q;
   if(st.phase==='open'&&st.question){
     var q=st.q;
@@ -121,7 +139,8 @@ async function firebaseBackend(){
   return{
     subscribe:function(c,cb){return F.onSnapshot(F.doc(db,'live',c),function(s){cb(s.exists()?s.data():null)},function(){cb(null)})},
     subscribeDisplay:function(c,cb){return F.onSnapshot(F.doc(db,'display',c),function(s){cb(s.exists()?s.data():null)},function(){})},
-    submit:function(c,q,a){return F.setDoc(F.doc(db,'live',c,'answers',uid+'_'+q),{uid:uid,q:q,a:a})}
+    submit:function(c,q,a){return F.setDoc(F.doc(db,'live',c,'answers',uid+'_'+q),{uid:uid,q:q,a:a})},
+    buzz:function(c,q,a){return F.setDoc(F.doc(db,'live',c,'answers',uid+'_'+q),{uid:uid,q:q,a:a,t:F.serverTimestamp()})}
   };
 }
 

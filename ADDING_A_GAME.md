@@ -43,3 +43,20 @@ GAMES.register({
 
 No Firestore rules change is needed: the same `questions`, `surveys` and `display` collections are used,
 with a `game` field on each document.
+
+## Moving questions between shows
+
+Give your game two small adapter functions and it joins the "Copy to..." menus automatically:
+
+```js
+toCommon(item)   { return {text, answer, answers:[{en,count}], hint, category, pts, tags, source} },
+fromCommon(c)    { return {game:'myGame', kind:'card', en:c.text, answer:c.answer, ...} }
+```
+
+Every library row and every tagged set gets a "Copy to..." menu listing the other shows. Copies skip duplicates and are tagged "Copied from <show>".
+
+## Phone buzzer (optional, any game)
+
+Phones that join with the session code switch to a buzzer screen when the live document has `mode:'buzzer'`.
+A buzz is one answer document `{uid, q, a:'<teamIndex>|<teamName>', t:serverTimestamp}`; the tech console reads
+them in server-time order (`Cloud.getBuzzes`), locks the first team, and reopens for the remaining teams after a wrong answer.
