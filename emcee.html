@@ -40,6 +40,258 @@ h1{font-size:22px;margin:0 0 6px}
 @media(prefers-reduced-motion:reduce){.live{animation:none}}
 </style>
 <script src="firebase-config.js"></script>
+<script>/* games.js - the game registry shared by the host console (index), the emcee view and the projector display.
+   Every game is a plug-in with the SAME contract:
+     id, label, icon, itemLabel, fields[], kinds[], defaults
+     row(item)            -> {a, b, chip}   one line in the content library
+     summary(items)       -> text for the session screen
+     validate(items)      -> '' or an error message
+     init(items, sv)      -> state S (JSON only; saved at surveys/{id}/data/game as {game,S})
+     act(S, action, d)    -> mutates S (the tech console calls this)
+     tech(S)              -> HTML for the IT tech console   (buttons use data-g="<id>" data-act="..."; inputs data-gi)
+     host(S)              -> HTML for the emcee (read-only, may show hidden answers)
+     publicState(S, sv)   -> JSON mirrored to display/{code}  (NEVER hidden answers)
+     display(D)           -> HTML for the projector
+   Add a new game by registering one more object with window.GAMES.register(...). Nothing else changes. */
+(function(){
+'use strict';
+var G={};window.GAMES=G;
+G.order=[];
+G.register=function(g){G[g.id]=g;if(G.order.indexOf(g.id)<0)G.order.push(g.id)};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+G.esc=esc;
+var clone=function(o){return JSON.parse(JSON.stringify(o))};
+var norm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()};
+var TEAMS=['Truth','Right Action','Peace','Love'];
+function mkTeams(n,old){var a=[];for(var i=0;i<n;i++)a.push({name:(old&&old[i]&&old[i].name)||TEAMS[i]||('Team '+(i+1)),score:(old&&old[i]&&old[i].score)||0});return a}
+function leader(teams){var m=Math.max.apply(null,teams.map(function(t){return t.score})),w=teams.filter(function(t){return t.score===m});return w.length===1?w[0]:null}
+
+/* ---------- shared styles (injected once, used on every page) ---------- */
+var css='.gm{font-family:inherit;color:#f7faff}'+
+'.gm-score{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 12px}'+
+'.gm-team{border:1px solid rgba(203,225,247,.2);border-radius:12px;padding:8px 12px;background:#0f2b49}'+
+'.gm-team.on{border-color:#f4cb73;box-shadow:0 0 0 2px rgba(244,203,115,.5)}'+
+'.gm-team b{display:block;font-size:12px;color:#abc1d9}.gm-team b i{font-style:normal;background:#f4cb73;color:#152a3f;border-radius:9px;padding:0 6px;margin-left:6px;font-size:10px}'+
+'.gm-team span{font-size:30px;font-weight:900;color:#f4cb73;font-variant-numeric:tabular-nums}'+
+'.gm-big .gm-team{padding:1.4vh 1.4vw;border-radius:16px}.gm-big .gm-team b{font-size:clamp(14px,1.8vw,26px)}.gm-big .gm-team span{font-size:clamp(34px,5.4vw,84px)}'+
+'.gm-cat{font-size:11px;letter-spacing:.14em;font-weight:900;color:#f4cb73;text-transform:uppercase}.gm-big .gm-cat{font-size:clamp(12px,1.4vw,20px)}'+
+'.gm-q{font-size:22px;font-weight:800;line-height:1.25;margin:6px 0 10px}.gm-big .gm-q{font-size:clamp(26px,4.2vw,64px);text-align:center;margin:2vh auto;max-width:1200px;line-height:1.15}'+
+'.gm-a{padding:10px 12px;border-radius:10px;background:#0f4a46;border:1px solid #1b9c96;color:#d6fff8;font-weight:800;margin:8px 0}.gm-big .gm-a{font-size:clamp(22px,3.4vw,52px);text-align:center;padding:2vh 2vw}'+
+'.gm-note{font-size:12px;color:#abc1d9;margin:4px 0}.gm-warn{padding:8px 12px;border-radius:10px;background:rgba(112,45,59,.55);border:1px solid #ff8a8a;color:#ffd6cf;font-weight:800;margin:8px 0}'+
+'.gm-grid{display:grid;gap:6px;margin:8px 0}.gm-cell{padding:10px 4px;border-radius:8px;border:1px solid rgba(203,225,247,.2);background:#16406a;color:#f4cb73;font-weight:900;font-size:18px;text-align:center;cursor:pointer;font-family:inherit}'+
+'.gm-cell.used{background:#0b1f36;color:#2f4a66;cursor:default;border-color:rgba(203,225,247,.08)}.gm-head{padding:10px 4px;background:#0d2745;border-radius:8px;text-align:center;font-weight:900;font-size:13px;color:#fff;border:1px solid rgba(203,225,247,.2);display:flex;align-items:center;justify-content:center}'+
+'.gm-big .gm-cell{font-size:clamp(20px,3.6vw,56px);padding:2.4vh 0}.gm-big .gm-head{font-size:clamp(12px,1.7vw,26px);padding:1.6vh .4vw}'+
+'.gm-timer{font-size:28px;font-weight:900;color:#f4cb73;font-variant-numeric:tabular-nums}.gm-timer.u{color:#ff827e}.gm-big .gm-timer{font-size:clamp(34px,5vw,80px)}'+
+'.gm-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}.gm-row label{font-size:12px;color:#abc1d9;display:flex;gap:6px;align-items:center}'+
+'.gm-row input,.gm-row select{font:inherit;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid rgba(203,225,247,.3);background:#0b2341;color:#fff;width:auto}'+
+'.gm-b{font:inherit;font-weight:800;font-size:13px;padding:8px 12px;border-radius:9px;border:1px solid rgba(203,225,247,.25);background:#153354;color:#f7faff;cursor:pointer}.gm-b.gold{background:#f4cb73;color:#152a3f;border-color:#f4cb73}.gm-b.red{background:#702d3b;border-color:#a44d5b}.gm-b.grn{background:#0f4a46;border-color:#1b9c96}'+
+'.gm-sound{font-size:clamp(46px,12vw,200px);font-weight:900;color:#f4cb73;text-align:center;line-height:1;letter-spacing:.04em;margin:1vh 0;text-transform:uppercase}.gm-chain{display:flex;flex-direction:column;gap:6px;margin-top:8px}'+
+'.gm-link{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid rgba(203,225,247,.2);background:#0d2745}.gm-link.bad{opacity:.65;border-color:#a44d5b}.gm-link small{color:#abc1d9}.gm-big .gm-link{font-size:clamp(14px,2vw,30px);padding:1vh 1vw}'+
+'.gm-win{margin:3vh auto;text-align:center;padding:3vh 3vw;border-radius:20px;background:rgba(244,203,115,.1);border:2px solid rgba(244,203,115,.5);max-width:900px}.gm-win h2{font-size:clamp(28px,5vw,76px);color:#f4cb73;margin:6px 0}'+
+'.gm-sug{display:flex;gap:6px;flex-wrap:wrap}.gm-sug span{background:#16406a;border-radius:14px;padding:3px 10px;font-size:12px}'+
+'.gm-sec{border:1px solid rgba(203,225,247,.15);border-radius:12px;padding:10px 12px;margin:10px 0;background:rgba(10,29,56,.5)}';
+if(typeof document!=='undefined'){var st=document.createElement('style');st.textContent=css;(document.head||document.documentElement).appendChild(st);
+  setInterval(function(){var els=document.querySelectorAll('.gm-timer');for(var i=0;i<els.length;i++){var e=els[i],end=+e.getAttribute('data-end')||0,s=+e.getAttribute('data-secs')||0,l=end?Math.max(0,Math.ceil((end-Date.now())/1000)):s;e.textContent=l+'s';e.className='gm-timer'+(end&&l<=5?' u':'')}},400)}
+function teamBoard(teams,turn,big){return '<div class="gm-score">'+teams.map(function(t,i){return '<div class="gm-team'+(i===turn?' on':'')+'"><b>'+esc(t.name)+(i===turn?'<i>TURN</i>':'')+'</b><span>'+t.score+'</span></div>'}).join('')+'</div>'}
+function timerHtml(S){if(!S.timerSecs&&!S.timerEndsAt)return '';return '<span class="gm-timer" data-end="'+(S.timerEndsAt||0)+'" data-secs="'+(S.timerSecs||0)+'">'+(S.timerSecs||0)+'s</span>'}
+function btn(g,act,label,attrs,cls){return '<button class="gm-b '+(cls||'')+'" data-g="'+g+'" data-act="'+act+'"'+(attrs||'')+'>'+label+'</button>'}
+function teamTools(g,S){return '<div class="gm-row"><label>Teams <select data-gi="'+g+'" data-act="nteams">'+[2,3,4,5,6].map(function(n){return '<option'+(S.teams.length===n?' selected':'')+'>'+n+'</option>'}).join('')+'</select></label>'+
+  S.teams.map(function(t,i){return '<label><input data-gi="'+g+'" data-act="tname" data-i="'+i+'" value="'+esc(t.name)+'" size="12"></label>'}).join('')+'</div>'}
+function adjust(g,S){return '<div class="gm-row">'+S.teams.map(function(t,i){return '<span class="gm-note">'+esc(t.name)+' </span>'+btn(g,'adj','−',' data-i="'+i+'" data-v="-100"')+btn(g,'adj','+',' data-i="'+i+'" data-v="100"')}).join('')+'<span class="gm-note">manual score fix (±100)</span></div>'}
+function setTeams(S,n){S.teams=mkTeams(Math.max(2,Math.min(6,+n||4)),S.teams)}
+function timerAct(S,a,d){if(a==='timer'){S.timerSecs=+d.secs||30;S.timerEndsAt=Date.now()+S.timerSecs*1000;return true}if(a==='tstop'){S.timerEndsAt=0;return true}return false}
+function timerBtns(g,S){return '<div class="gm-row">'+timerHtml(S)+[15,30,60].map(function(s){return btn(g,'timer',s+'s',' data-secs="'+s+'"')}).join('')+btn(g,'tstop','Stop')+'</div>'}
+
+/* =================================================== JEOPARDY =================================================== */
+G.register({
+  id:'jeopardy',label:'Jeopardy',icon:'🎯',itemLabel:'clue',itemsLabel:'Jeopardy clues',
+  kinds:[['clue','Board clue'],['lightning','Lightning round'],['final','Final clue']],
+  fields:[
+    {k:'en',label:'Clue (read to the teams)',t:'textarea',full:1},
+    {k:'answer',label:'Answer',t:'textarea',full:1},
+    {k:'category',label:'Category',t:'text'},
+    {k:'pts',label:'Points (board clues)',t:'select',opts:[100,200,300,400,500,600,700,800,900,1000]},
+    {k:'kind',label:'Type',t:'kind'},
+    {k:'source',label:'Source note',t:'text',full:1},
+    {k:'tags',label:'Sets / tags (comma separated)',t:'tags',full:1}],
+  defaults:{kind:'clue',pts:100},
+  row:function(q){return{a:q.en,b:(q.category||'')+(q.kind==='clue'?' · '+q.pts:''),chip:q.kind==='clue'?'Clue':q.kind==='final'?'Final':'Lightning'}},
+  summary:function(items){var c={};items.forEach(function(q){c[q.kind||'clue']=(c[q.kind||'clue']||0)+1});return (c.clue||0)+' board clues · '+(c.lightning||0)+' lightning · '+(c.final||0)+' final'},
+  validate:function(items){return items.some(function(q){return (q.kind||'clue')==='clue'})?'':'A Jeopardy session needs at least one board clue.'},
+  init:function(items){
+    var cats=[],by={};
+    items.filter(function(q){return (q.kind||'clue')==='clue'}).forEach(function(q){var c=q.category||'General';if(!by[c]){by[c]={name:c,clues:[]};cats.push(by[c])}by[c].clues.push({pts:+q.pts||100,q:q.en,a:q.answer||'',src:q.source||'',used:false})});
+    cats.forEach(function(c){c.clues.sort(function(a,b){return a.pts-b.pts})});
+    var fin=items.filter(function(q){return q.kind==='final'})[0];
+    return{game:'jeopardy',teams:mkTeams(4),cats:cats,final:fin?{cat:fin.category||'Final',q:fin.en,a:fin.answer||'',src:fin.source||''}:null,
+      lightning:items.filter(function(q){return q.kind==='lightning'}).map(function(q){return{q:q.en,a:q.answer||'',src:q.source||'',used:false}}),
+      view:'board',cur:null,timerSecs:0,timerEndsAt:0,fin:{step:0,wagers:[],res:[]},lg:{i:-1,reveal:false},lpts:1}},
+  act:function(S,a,d){
+    var cl=S.cur?S.cats[S.cur.c].clues[S.cur.i]:null;
+    if(timerAct(S,a,d))return S;
+    switch(a){
+      case 'nteams':setTeams(S,d.v);break;
+      case 'tname':S.teams[+d.i].name=String(d.v||'').trim()||('Team '+(+d.i+1));break;
+      case 'adj':S.teams[+d.i].score+=+d.v;break;
+      case 'open':S.cur={c:+d.c,i:+d.i,reveal:false,dd:false,wager:0};S.view='clue';S.timerEndsAt=0;S.timerSecs=0;break;
+      case 'reveal':if(S.cur)S.cur.reveal=true;break;
+      case 'dd':if(S.cur){S.cur.dd=!S.cur.dd;S.cur.wager=S.cur.dd?cl.pts:0}break;
+      case 'wager':if(S.cur)S.cur.wager=Math.max(0,+d.v||0);break;
+      case 'right':if(cl){S.teams[+d.i].score+=S.cur.dd?S.cur.wager:cl.pts;cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0}break;
+      case 'wrong':if(cl){S.teams[+d.i].score-=S.cur.dd?S.cur.wager:cl.pts;if(S.cur.dd){cl.used=true;S.cur=null;S.view='board'}}break;
+      case 'close':if(cl){cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0}break;
+      case 'back':S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;break;
+      case 'final':if(S.final){S.view='final';S.fin={step:0,wagers:S.teams.map(function(){return 0}),res:S.teams.map(function(){return null})}}break;
+      case 'fstep':S.fin.step=Math.min(3,S.fin.step+1);break;
+      case 'fwager':S.fin.wagers[+d.i]=Math.max(0,+d.v||0);break;
+      case 'fres':{var i=+d.i,w=S.fin.wagers[i]||0,old=S.fin.res[i];if(old===true)S.teams[i].score-=w;if(old===false)S.teams[i].score+=w;
+        var ok=d.ok==='1'?true:d.ok==='0'?false:null;S.fin.res[i]=ok;if(ok===true)S.teams[i].score+=w;if(ok===false)S.teams[i].score-=w;break}
+      case 'lightning':if(S.lightning.length){S.view='lightning';S.lg={i:0,reveal:false}}break;
+      case 'lreveal':S.lg.reveal=true;break;
+      case 'lpt':S.teams[+d.i].score+=S.lpts;S.lightning[S.lg.i].used=true;S.lg.i=Math.min(S.lightning.length-1,S.lg.i+1);S.lg.reveal=false;break;
+      case 'lnext':S.lightning[S.lg.i].used=true;S.lg.i=Math.min(S.lightning.length-1,S.lg.i+1);S.lg.reveal=false;break;
+      case 'lpts':S.lpts=Math.max(1,+d.v||1);break;
+      case 'boardview':S.view='board';S.cur=null;break;
+      case 'done':S.view='done';S.timerEndsAt=0;break;
+    }
+    return S},
+  tech:function(S){
+    var g='jeopardy',h='<div class="gm">'+teamBoard(S.teams,-1)+teamTools(g,S)+adjust(g,S);
+    if(S.view==='board'){
+      var rows=0;S.cats.forEach(function(c){rows=Math.max(rows,c.clues.length)});
+      h+='<div class="gm-cat">Pick a clue</div><div class="gm-grid" style="grid-template-columns:repeat('+Math.max(1,S.cats.length)+',1fr)">'+
+        S.cats.map(function(c){return '<div class="gm-head">'+esc(c.name)+'</div>'}).join('')+
+        Array.from({length:rows},function(_,r){return S.cats.map(function(c,ci){var k=c.clues[r];return k?(k.used?'<div class="gm-cell used">·</div>':btn(g,'open',k.pts,' data-c="'+ci+'" data-i="'+r+'"','gm-cell')):'<div></div>'}).join('')}).join('')+'</div>'+
+        '<div class="gm-row">'+(S.lightning.length?btn(g,'lightning','⚡ Lightning round ('+S.lightning.length+')'):'')+(S.final?btn(g,'final','🏁 Final clue','','gold'):'')+btn(g,'done','Finish game &amp; show winner','','grn')+'</div>';
+    }else if(S.view==='clue'&&S.cur){
+      var c=S.cats[S.cur.c],k=c.clues[S.cur.i];
+      h+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">Source: '+esc(k.src)+'</div>':'')+
+        '<div class="gm-row">'+btn(g,'reveal',S.cur.reveal?'Answer shown on screen ✓':'Show answer on the big screen',S.cur.reveal?' disabled':'')+btn(g,'dd',S.cur.dd?'Daily Double ON':'Daily Double?','', S.cur.dd?'gold':'')+(S.cur.dd?'<label>Wager <input type="number" min="0" data-gi="'+g+'" data-act="wager" value="'+S.cur.wager+'" style="width:90px"></label>':'')+'</div>'+timerBtns(g,S)+
+        '<div class="gm-note">Correct answer: who gets the points?</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'right','✓ '+esc(t.name),' data-i="'+i+'"','grn')}).join('')+'</div>'+
+        '<div class="gm-note">Wrong answer (deducts points, clue stays open):</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'wrong','✗ '+esc(t.name),' data-i="'+i+'"','red')}).join('')+'</div>'+
+        '<div class="gm-row">'+btn(g,'close','No one got it — close clue')+btn(g,'back','← Back to board (keep clue)')+'</div></div>';
+    }else if(S.view==='final'){
+      h+='<div class="gm-sec"><div class="gm-cat">Final clue · '+esc(S.final.cat)+'</div>'+
+        '<div class="gm-row">'+btn(g,'fstep',S.fin.step===0?'Show category':S.fin.step===1?'Show clue':S.fin.step===2?'Show answer':'All shown',S.fin.step>=3?' disabled':'','gold')+btn(g,'boardview','← Board')+btn(g,'done','Finish game','','grn')+'</div>'+
+        '<div class="gm-q">'+esc(S.final.q)+'</div><div class="gm-a">Answer: '+esc(S.final.a)+'</div>'+
+        S.teams.map(function(t,i){return '<div class="gm-row"><b style="min-width:110px">'+esc(t.name)+'</b><label>Wager <input type="number" min="0" data-gi="'+g+'" data-act="fwager" data-i="'+i+'" value="'+(S.fin.wagers[i]||0)+'" style="width:90px"></label>'+
+          btn(g,'fres','✓',' data-i="'+i+'" data-ok="1"',S.fin.res[i]===true?'grn':'')+btn(g,'fres','✗',' data-i="'+i+'" data-ok="0"',S.fin.res[i]===false?'red':'')+btn(g,'fres','clear',' data-i="'+i+'" data-ok=""')+'</div>'}).join('')+'</div>';
+    }else if(S.view==='lightning'){
+      var L=S.lightning[S.lg.i];
+      h+='<div class="gm-sec"><div class="gm-cat">Lightning round · '+(S.lg.i+1)+' of '+S.lightning.length+' · '+S.lpts+' pt each</div><div class="gm-q">'+esc(L.q)+'</div><div class="gm-a">Answer: '+esc(L.a)+'</div>'+
+        '<div class="gm-row">'+btn(g,'lreveal','Show answer on screen')+S.teams.map(function(t,i){return btn(g,'lpt','+'+S.lpts+' '+esc(t.name),' data-i="'+i+'"','grn')}).join('')+btn(g,'lnext','Skip / nobody →')+btn(g,'boardview','← Board')+'<label>Pts <input type="number" min="1" data-gi="'+g+'" data-act="lpts" value="'+S.lpts+'" style="width:60px"></label></div></div>';
+    }else{h+='<div class="gm-sec"><div class="gm-cat">Game finished</div><div class="gm-row">'+btn(g,'boardview','← Back to board')+'</div></div>'}
+    return h+'</div>'},
+  host:function(S){
+    var g='<div class="gm">'+teamBoard(S.teams,-1);
+    if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];
+      g+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE (wager '+S.cur.wager+')':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">'+esc(k.src)+'</div>':'')+(S.cur.reveal?'<div class="gm-note">Answer is showing on the big screen.</div>':'')+'</div>'}
+    else if(S.view==='final'){g+='<div class="gm-sec"><div class="gm-cat">Final clue · '+esc(S.final.cat)+' · step '+S.fin.step+'/3</div><div class="gm-q">'+esc(S.final.q)+'</div><div class="gm-a">Answer: '+esc(S.final.a)+'</div></div>'}
+    else if(S.view==='lightning'){var L=S.lightning[S.lg.i];g+='<div class="gm-sec"><div class="gm-cat">Lightning · '+(S.lg.i+1)+'/'+S.lightning.length+'</div><div class="gm-q">'+esc(L.q)+'</div><div class="gm-a">Answer: '+esc(L.a)+'</div></div>'}
+    else if(S.view==='done'){var w=leader(S.teams);g+='<div class="gm-win"><div>FINAL</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2></div>'}
+    else{g+='<div class="gm-sec"><div class="gm-cat">Board</div><div class="gm-grid" style="grid-template-columns:repeat('+Math.max(1,S.cats.length)+',1fr)">'+S.cats.map(function(c){return '<div class="gm-head">'+esc(c.name)+'</div>'}).join('')+
+      (function(){var rows=0;S.cats.forEach(function(c){rows=Math.max(rows,c.clues.length)});return Array.from({length:rows},function(_,r){return S.cats.map(function(c){var k=c.clues[r];return k?'<div class="gm-cell'+(k.used?' used':'')+'">'+(k.used?'·':k.pts)+'</div>':'<div></div>'}).join('')}).join('')})()+'</div></div>'}
+    return g+'</div>'},
+  publicState:function(S,sv){
+    var D={game:'jeopardy',title:sv&&sv.name||'',view:S.view,teams:S.teams.map(function(t){return{name:t.name,score:t.score}}),
+      cats:S.cats.map(function(c){return{name:c.name,clues:c.clues.map(function(k){return{pts:k.pts,used:k.used}})}}),
+      timerSecs:S.timerSecs||0,timerEndsAt:S.timerEndsAt||0,updatedAt:Date.now()};
+    if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];D.cur={cat:c.name,pts:k.pts,q:k.q,a:S.cur.reveal?k.a:null,dd:S.cur.dd,wager:S.cur.dd?S.cur.wager:0}}
+    if(S.view==='final'&&S.final)D.final={cat:S.final.cat,q:S.fin.step>=2?S.final.q:null,a:S.fin.step>=3?S.final.a:null,step:S.fin.step};
+    if(S.view==='lightning'){var L=S.lightning[S.lg.i];D.lg={n:S.lg.i+1,of:S.lightning.length,q:L.q,a:S.lg.reveal?L.a:null}}
+    return D},
+  display:function(D){
+    var h='<div class="gm gm-big">'+teamBoard(D.teams,-1,true);
+    if(D.view==='clue'&&D.cur){var c=D.cur;h+='<div class="gm-cat" style="text-align:center">'+esc(c.cat)+' · '+c.pts+(c.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(c.q)+'</div>'+(c.a?'<div class="gm-a">'+esc(c.a)+'</div>':'')+'<div style="text-align:center">'+timerHtml(D)+'</div>'}
+    else if(D.view==='final'&&D.final){var f=D.final;h+='<div class="gm-cat" style="text-align:center">Final clue</div><div class="gm-q">'+esc(f.cat)+'</div>'+(f.q?'<div class="gm-q" style="font-size:clamp(20px,3vw,44px)">'+esc(f.q)+'</div>':'')+(f.a?'<div class="gm-a">'+esc(f.a)+'</div>':'')}
+    else if(D.view==='lightning'&&D.lg){h+='<div class="gm-cat" style="text-align:center">Lightning round · '+D.lg.n+' of '+D.lg.of+'</div><div class="gm-q">'+esc(D.lg.q)+'</div>'+(D.lg.a?'<div class="gm-a">'+esc(D.lg.a)+'</div>':'')}
+    else if(D.view==='done'){var w=leader(D.teams);h+='<div class="gm-win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2></div>'}
+    else{var rows=0;D.cats.forEach(function(c){rows=Math.max(rows,c.clues.length)});
+      h+='<div class="gm-grid" style="grid-template-columns:repeat('+Math.max(1,D.cats.length)+',1fr)">'+D.cats.map(function(c){return '<div class="gm-head">'+esc(c.name)+'</div>'}).join('')+
+        Array.from({length:rows},function(_,r){return D.cats.map(function(c){var k=c.clues[r];return k?'<div class="gm-cell'+(k.used?' used':'')+'">'+(k.used?'':k.pts)+'</div>':'<div></div>'}).join('')}).join('')+'</div>'}
+    return h+'</div>'}
+});
+
+/* =================================================== ANTAKSHARI =================================================== */
+function lastSound(title){
+  var w=norm(title).split(' ').filter(Boolean).pop()||'';
+  var m=w.match(/(?:bh|ch|dh|gh|jh|kh|ph|sh|th|[^aeiou])?[aeiou]+(?:sh|[^aeiou])?$/);return m?m[0]:w.slice(-2)}
+function firstWord(s){return norm(s)}
+G.lastSound=lastSound;
+G.register({
+  id:'antakshari',label:'Antakshari',icon:'🎶',itemLabel:'bhajan',itemsLabel:'Bhajans',
+  kinds:[['bhajan','Bhajan']],
+  fields:[
+    {k:'en',label:'Bhajan title (or first line)',t:'text',full:1},
+    {k:'hint',label:'Opening words (optional, a short hint)',t:'text',full:1},
+    {k:'category',label:'Deity / theme (optional)',t:'text'},
+    {k:'tags',label:'Sets / tags (comma separated)',t:'tags',full:1}],
+  defaults:{kind:'bhajan'},
+  row:function(q){return{a:q.en,b:q.hint||q.category||'',chip:'Bhajan'}},
+  summary:function(items){return items.length+' bhajans in the helper list (teams may sing any bhajan)'},
+  validate:function(){return ''},
+  init:function(items){
+    return{game:'antakshari',teams:mkTeams(4),turn:0,sound:'',chain:[],used:[],pts:2,view:'play',warn:'',timerSecs:0,timerEndsAt:0,
+      bank:items.map(function(q){return{t:q.en,h:q.hint||''}})}},
+  act:function(S,a,d){
+    if(a!=='noop')S.warn='';
+    if(timerAct(S,a,d))return S;
+    switch(a){
+      case 'nteams':setTeams(S,d.v);S.turn=Math.min(S.turn,S.teams.length-1);break;
+      case 'tname':S.teams[+d.i].name=String(d.v||'').trim()||('Team '+(+d.i+1));break;
+      case 'adj':S.teams[+d.i].score+=+d.v;break;
+      case 'turn':S.turn=+(d.v!==undefined?d.v:d.i)||0;break;
+      case 'sound':S.sound=norm(d.v);break;
+      case 'pts':S.pts=Math.max(1,+d.v||1);break;
+      case 'valid':{var t=String(d.title||'').trim();if(!t){S.warn='Type the bhajan that was sung first.';break}
+        var n=norm(t);
+        if(d.force!=='1'){
+          if(S.used.indexOf(n)>=0){S.warn='"'+t+'" was already sung. Press "Accept anyway" if you still want to count it.';S.pending=t;break}
+          if(S.sound&&n.indexOf(S.sound)!==0){S.warn='"'+t+'" does not start with "'+S.sound+'". Press "Accept anyway" to override.';S.pending=t;break}}
+        S.pending='';S.teams[S.turn].score+=S.pts;S.used.push(n);S.chain.push({t:S.turn,title:t,ok:true});S.sound=lastSound(t);S.turn=(S.turn+1)%S.teams.length;
+        if(S.timerSecs)S.timerEndsAt=Date.now()+S.timerSecs*1000;break}
+      case 'miss':S.chain.push({t:S.turn,title:'(no bhajan in time)',ok:false});S.sound='';S.turn=(S.turn+1)%S.teams.length;S.timerEndsAt=0;break;
+      case 'newchain':S.sound='';S.timerEndsAt=0;break;
+      case 'undo':{var l=S.chain.pop();if(l){S.turn=l.t;if(l.ok){S.teams[l.t].score-=S.pts;S.used.pop();var p=S.chain.filter(function(x){return x.ok}).pop();S.sound=p?lastSound(p.title):''}}break}
+      case 'done':S.view='done';S.timerEndsAt=0;break;
+      case 'resume':S.view='play';break;
+    }
+    return S},
+  tech:function(S){
+    var g='antakshari',n=S.sound,sug=S.bank.filter(function(b){return n&&norm(b.t).indexOf(n)===0&&S.used.indexOf(norm(b.t))<0}).slice(0,10);
+    var h='<div class="gm">'+teamBoard(S.teams,S.turn)+teamTools(g,S)+adjust(g,S);
+    h+='<div class="gm-sec"><div class="gm-cat">Next bhajan must start with</div><div class="gm-sound">'+(S.sound?esc(S.sound):'any')+'</div>'+
+      '<div class="gm-row"><label>Change sound <input data-gi="'+g+'" data-act="sound" value="'+esc(S.sound)+'" size="8" placeholder="e.g. re"></label>'+btn(g,'newchain','Free start (new chain)')+'<label>Pts per link <input type="number" min="1" data-gi="'+g+'" data-act="pts" value="'+S.pts+'" style="width:60px"></label></div>'+timerBtns(g,S)+
+      '<div class="gm-row"><label>Turn <select data-gi="'+g+'" data-act="turn" data-isel="1">'+S.teams.map(function(t,i){return '<option value="'+i+'"'+(i===S.turn?' selected':'')+'>'+esc(t.name)+'</option>'}).join('')+'</select></label></div>'+
+      (S.warn?'<div class="gm-warn">'+esc(S.warn)+'</div>':'')+
+      '<div class="gm-row"><label>'+esc(S.teams[S.turn].name)+' sang <input id="gm_song" data-g-input="title" size="28" placeholder="bhajan title" value="'+esc(S.pending||'')+'"></label>'+
+        '<button class="gm-b grn" data-g="'+g+'" data-act="valid" data-from="gm_song">✓ Valid (+'+S.pts+')</button>'+
+        (S.pending?'<button class="gm-b gold" data-g="'+g+'" data-act="valid" data-from="gm_song" data-force="1">Accept anyway</button>':'')+
+        btn(g,'miss','✗ Missed / time up','','red')+btn(g,'undo','↶ Undo last')+'</div>'+
+      (sug.length?'<div class="gm-note">Ideas starting with "'+esc(S.sound)+'":</div><div class="gm-sug">'+sug.map(function(b){return '<span>'+esc(b.t)+'</span>'}).join('')+'</div>':'')+'</div>'+
+      '<div class="gm-sec"><div class="gm-cat">Chain ('+S.chain.filter(function(c){return c.ok}).length+' bhajans sung)</div><div class="gm-chain">'+
+        S.chain.slice(-8).reverse().map(function(c){return '<div class="gm-link'+(c.ok?'':' bad')+'"><b>'+esc(S.teams[c.t]?S.teams[c.t].name:'')+'</b> '+esc(c.title)+'</div>'}).join('')+'</div>'+
+        '<div class="gm-row">'+btn(g,'done','Finish game &amp; show winner','','grn')+(S.view==='done'?btn(g,'resume','Resume'):'')+'</div></div></div>';
+    return h},
+  host:function(S){
+    var n=S.sound,sug=S.bank.filter(function(b){return n&&norm(b.t).indexOf(n)===0&&S.used.indexOf(norm(b.t))<0}).slice(0,12);
+    if(S.view==='done'){var w=leader(S.teams);return '<div class="gm">'+teamBoard(S.teams,-1)+'<div class="gm-win"><div>FINAL</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2></div></div>'}
+    return '<div class="gm">'+teamBoard(S.teams,S.turn)+'<div class="gm-sec"><div class="gm-cat">'+esc(S.teams[S.turn].name)+' to sing · next bhajan starts with</div><div class="gm-sound">'+(S.sound?esc(S.sound):'any')+'</div>'+timerHtml(S)+
+      (sug.length?'<div class="gm-note">Prompts if a team is stuck:</div><div class="gm-sug">'+sug.map(function(b){return '<span>'+esc(b.t)+'</span>'}).join('')+'</div>':'')+'</div>'+
+      '<div class="gm-sec"><div class="gm-cat">Chain</div><div class="gm-chain">'+S.chain.slice(-6).reverse().map(function(c){return '<div class="gm-link'+(c.ok?'':' bad')+'"><b>'+esc(S.teams[c.t].name)+'</b> '+esc(c.title)+'</div>'}).join('')+'</div></div></div>'},
+  publicState:function(S,sv){
+    return{game:'antakshari',title:sv&&sv.name||'',view:S.view,teams:S.teams.map(function(t){return{name:t.name,score:t.score}}),turn:S.turn,sound:S.sound,
+      chain:S.chain.slice(-6).map(function(c){return{team:S.teams[c.t]?S.teams[c.t].name:'',title:c.title,ok:c.ok}}),count:S.chain.filter(function(c){return c.ok}).length,
+      timerSecs:S.timerSecs||0,timerEndsAt:S.timerEndsAt||0,updatedAt:Date.now()}},
+  display:function(D){
+    var h='<div class="gm gm-big">'+teamBoard(D.teams,D.view==='done'?-1:D.turn,true);
+    if(D.view==='done'){var w=leader(D.teams);return h+'<div class="gm-win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2><div>'+D.count+' bhajans sung</div></div></div>'}
+    h+='<div class="gm-cat" style="text-align:center">'+esc(D.teams[D.turn].name)+' — next bhajan starts with</div><div class="gm-sound">'+(D.sound?esc(D.sound):'any')+'</div><div style="text-align:center">'+timerHtml(D)+'</div>'+
+      '<div class="gm-chain">'+D.chain.slice().reverse().map(function(c){return '<div class="gm-link'+(c.ok?'':' bad')+'"><b>'+esc(c.team)+'</b> '+esc(c.title)+'</div>'}).join('')+'</div>';
+    return h+'</div>'}
+});
+})();
+</script>
 </head>
 <body>
 <div class="wrap" id="app"></div>
@@ -57,12 +309,13 @@ function draw(){
   else if(state.stage==='denied')h+='<div class="card"><h1>Not approved</h1><p class="small">'+esc(state.user&&state.user.email)+' has not been approved as a host. Ask an admin to add you.</p></div>';
   else if(state.stage==='list'){
     h+='<div class="card"><h1>Choose the game</h1><p class="small">Games whose board is ready appear here. You will follow the board live as the IT tech runs it.</p><div class="list">'+
-      (state.surveys.map(function(s){return '<button data-a="open" data-id="'+esc(s.id)+'">'+esc(s.name)+'<div class="small">'+s.questions.length+' questions</div></button>'}).join('')||'<p class="small">No game is ready yet.</p>')+'</div><button data-a="refresh">Refresh</button></div>';
+      (state.surveys.map(function(s){return '<button data-a="open" data-id="'+esc(s.id)+'">'+(s.game&&window.GAMES&&GAMES[s.game]?GAMES[s.game].icon+' ':'')+esc(s.name)+'<div class="small">'+s.questions.length+' questions</div></button>'}).join('')||'<p class="small">No game is ready yet.</p>')+'</div><button data-a="refresh">Refresh</button></div>';
   }else if(state.stage==='game')h+=game();
   app.innerHTML=h}
 
 function game(){
   var S=state.S;
+  if(S&&S.game&&window.GAMES&&GAMES[S.game])return '<div class="small" style="margin:0 2px 8px"><span class="live"></span>Live · '+esc(state.sv.name)+'</div>'+GAMES[S.game].host(S);
   if(!S)return '<div class="card"><h1>'+esc(state.sv.name)+'</h1><p class="small"><span class="live"></span>Waiting for the IT tech to start the game…</p></div>';
   var A=S.teams.A,Bt=S.teams.B,view=S.view,rs=S.roundStates&&S.roundStates[S.round],ctl=view==='rounds'&&rs?rs.control:null;
   var h='<div class="score"><div class="team'+(ctl==='A'?' ctl':'')+'"><b>'+esc(A.name)+(ctl==='A'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+A.score+'</span></div><div class="team'+(ctl==='B'?' ctl':'')+'"><b>'+esc(Bt.name)+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+Bt.score+'</span></div></div>';
