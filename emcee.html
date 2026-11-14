@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One Sai Family — Emcee view</title>
+<style>
+:root{--navy:#07152b;--panel:#102d4d;--gold:#f4cb73;--white:#f7faff;--muted:#abc1d9;--teal:#64e1d0;--coral:#ff827e;--border:rgba(203,225,247,.18)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:linear-gradient(135deg,#071426,#0a1d38);color:var(--white);font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:14px 14px 40px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.k{font-size:10px;letter-spacing:.2em;font-weight:900;color:var(--gold)}
+.small{font-size:12px;color:var(--muted)}
+button{font:inherit;font-weight:800;border:1px solid var(--border);border-radius:10px;background:#153354;color:var(--white);padding:9px 12px;font-size:13px;cursor:pointer}
+button.gold{background:var(--gold);color:#152a3f;border-color:var(--gold)}
+.card{background:rgba(16,45,77,.8);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+h1{font-size:22px;margin:0 0 6px}
+.score{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.team{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#0f2b49}
+.team.ctl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.team b{display:block;font-size:12px;color:var(--muted)}.team span{font-size:30px;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums}
+.ctag{font-size:10px;background:var(--gold);color:#152a3f;border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:900;vertical-align:middle}
+.cat{font-size:11px;letter-spacing:.14em;font-weight:900;color:var(--gold)}
+.q{font-size:24px;font-weight:800;line-height:1.2;margin:6px 0 10px}
+.cue{font-size:13px;color:#cfe0ef;background:rgba(244,203,115,.08);border-left:3px solid var(--gold);padding:8px 10px;border-radius:6px;margin-bottom:12px}
+.ans{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:#0d2745}
+.ans .rk{width:26px;height:26px;border-radius:7px;background:#16406a;display:grid;place-items:center;font-weight:900;font-size:13px}
+.ans .t{flex:1;font-weight:700;font-size:16px}.ans .p{font-weight:900;color:var(--gold);min-width:34px;text-align:right}
+.ans.on{background:#0f4a46;border-color:#1b9c96}.ans.on .st{color:var(--teal)}
+.st{font-size:11px;font-weight:800;color:var(--muted);min-width:78px;text-align:right}
+.strikes{display:flex;gap:6px;margin:10px 0}.strikes i{font-style:normal;width:34px;height:34px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--border);color:#47607a;font-weight:900}
+.strikes i.on{background:#702d3b;border-color:#a44d5b;color:#ffb3a9}
+.banner{padding:10px 12px;border-radius:10px;background:rgba(112,45,59,.55);border:1px solid #ff8a8a;color:#ffd6cf;font-weight:900;text-align:center;margin-bottom:10px}
+.ok{padding:8px 12px;border-radius:10px;background:rgba(100,225,208,.12);border:1px solid rgba(100,225,208,.4);color:var(--teal);font-weight:800;font-size:13px;margin-top:8px}
+.fq{padding:10px 0;border-top:1px solid var(--border)}.fq:first-child{border-top:0}.fq .t{font-weight:800;margin-bottom:4px}.fq .a{font-size:13px;color:#cfe0ef}
+.list button{width:100%;text-align:left;margin-bottom:8px;padding:12px}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#64e1d0;margin-right:6px;animation:p 1.6s infinite}
+@keyframes p{50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.live{animation:none}}
+</style>
+<script src="firebase-config.js"></script>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+'use strict';
+var FB='https://www.gstatic.com/firebasejs/10.12.2/';
+var app=document.getElementById('app'),B=null,state={stage:'login',user:null,surveys:[],sv:null,S:null,unsub:null,msg:''};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+
+function topBar(){return '<div class="top"><div><div class="k">ONE SAI FAMILY · EMCEE VIEW</div><div class="small">'+(state.user?esc(state.user.email)+' · read-only':'Read-only live view of the game board')+'</div></div><div>'+
+  (state.sv?'<button data-a="back">Games</button> ':'')+(state.user?'<button data-a="out">Sign out</button>':'')+'</div></div>'}
+function draw(){
+  var h=topBar();
+  if(state.stage==='login')h+='<div class="card"><h1>Game host sign-in</h1><p class="small">Sign in with the Google account an admin approved for you. This screen shows the hidden answers, so it is not public.</p><button class="gold" data-a="in">Sign in with Google</button><div class="small" style="color:var(--coral);margin-top:10px">'+esc(state.msg)+'</div></div>';
+  else if(state.stage==='denied')h+='<div class="card"><h1>Not approved</h1><p class="small">'+esc(state.user&&state.user.email)+' has not been approved as a host. Ask an admin to add you.</p></div>';
+  else if(state.stage==='list'){
+    h+='<div class="card"><h1>Choose the game</h1><p class="small">Games whose board is ready appear here. You will follow the board live as the IT tech runs it.</p><div class="list">'+
+      (state.surveys.map(function(s){return '<button data-a="open" data-id="'+esc(s.id)+'">'+esc(s.name)+'<div class="small">'+s.questions.length+' questions</div></button>'}).join('')||'<p class="small">No game is ready yet.</p>')+'</div><button data-a="refresh">Refresh</button></div>';
+  }else if(state.stage==='game')h+=game();
+  app.innerHTML=h}
+
+function game(){
+  var S=state.S;
+  if(!S)return '<div class="card"><h1>'+esc(state.sv.name)+'</h1><p class="small"><span class="live"></span>Waiting for the IT tech to start the game…</p></div>';
+  var A=S.teams.A,Bt=S.teams.B,view=S.view,rs=S.roundStates&&S.roundStates[S.round],ctl=view==='rounds'&&rs?rs.control:null;
+  var h='<div class="score"><div class="team'+(ctl==='A'?' ctl':'')+'"><b>'+esc(A.name)+(ctl==='A'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+A.score+'</span></div><div class="team'+(ctl==='B'?' ctl':'')+'"><b>'+esc(Bt.name)+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+Bt.score+'</span></div></div>';
+  if(view==='fast'){
+    h+='<div class="card"><div class="cat">⚡ FAST MONEY · '+S.data.fast.length+' QUESTIONS</div><div style="margin-top:8px">'+
+      S.data.fast.map(function(f,i){return '<div class="fq"><div class="t">'+(i+1)+'. '+esc(f.question.en)+'</div><div class="a">'+f.answers.map(function(a){return esc(a.en)+' ('+a.count+')'}).join(' · ')+'</div></div>'}).join('')+'</div>'+
+      (S.fast.awarded?'<div class="ok">Points awarded: '+esc(A.name)+' +'+S.fast.awards.A+' · '+esc(Bt.name)+' +'+S.fast.awards.B+'</div>':'')+'</div>';
+  }else{
+    var r=S.data.rounds[S.round];
+    h+='<div class="card"><div class="cat">ROUND '+(S.round+1)+' OF '+S.data.rounds.length+' · '+esc(r.category.en)+(r.multiplier>1?' · ×'+r.multiplier:'')+'</div><div class="q">'+esc(r.question.en)+'</div>'+
+      (r.cue&&r.cue.en?'<div class="cue">'+esc(r.cue.en)+'</div>':'')+
+      (rs.strikes>=3&&!rs.awarded?'<div class="banner">STEAL — '+esc(S.teams[rs.control==='A'?'B':'A'].name)+' gets one guess</div>':'')+
+      r.answers.map(function(a,i){var on=rs.revealed[i];return '<div class="ans'+(on?' on':'')+'"><span class="rk">'+(i+1)+'</span><span class="t">'+esc(a.en)+'</span><span class="st">'+(on?'ON BOARD':'hidden')+'</span><span class="p">'+a.count+'</span></div>'}).join('')+
+      '<div class="strikes">'+[0,1,2].map(function(i){return '<i class="'+(i<rs.strikes?'on':'')+'">✕</i>'}).join('')+'</div>'+
+      (rs.awarded?'<div class="ok">Round awarded to '+esc(S.teams[rs.awarded.team].name)+' (+'+rs.awarded.points+')</div>':'')+'</div>';
+  }
+  return '<div class="small" style="margin:0 2px 8px"><span class="live"></span>Live · '+esc(state.sv.name)+'</div>'+h}
+
+app.addEventListener('click',function(e){
+  var b=e.target.closest('[data-a]');if(!b)return;var a=b.dataset.a;
+  if(a==='in')B.signIn().catch(function(err){state.msg='Sign-in failed: '+(err.message||err);draw()});
+  else if(a==='out'){if(state.unsub)state.unsub();B.signOut().then(function(){state.user=null;state.stage='login';state.sv=null;draw()})}
+  else if(a==='refresh')loadList();
+  else if(a==='back'){if(state.unsub)state.unsub();state.sv=null;state.S=null;state.stage='list';loadList()}
+  else if(a==='open'){var sv=state.surveys.filter(function(s){return s.id===b.dataset.id})[0];state.sv=sv;state.S=null;state.stage='game';draw();
+    if(state.unsub)state.unsub();state.unsub=B.watchGame(sv.id,function(g){state.S=g&&g.S||null;draw()})}
+});
+function loadList(){B.listReady().then(function(l){state.surveys=l;state.stage='list';draw()}).catch(function(e){state.msg=String(e.message||e);state.stage='list';draw()})}
+function onUser(u){
+  if(!u){state.user=null;state.stage='login';draw();return}
+  state.user=u;B.getRole(u).then(function(r){if(r==='host'||r==='tech'||r==='admin')loadList();else{state.stage='denied';draw()}})}
+
+async function firebaseBackend(){
+  var cfg=window.FIREBASE_CONFIG;if(!cfg||!cfg.apiKey||/PASTE|YOUR/i.test(cfg.apiKey))throw new Error('This site is not configured yet (firebase-config.js).');
+  var A=await import(FB+'firebase-app.js'),F=await import(FB+'firebase-firestore.js'),Au=await import(FB+'firebase-auth.js');
+  var app_=A.initializeApp(cfg),db=F.getFirestore(app_),auth=Au.getAuth(app_);
+  return{
+    signIn:function(){return Au.signInWithPopup(auth,new Au.GoogleAuthProvider())},
+    signOut:function(){return Au.signOut(auth)},
+    onAuth:function(cb){Au.onAuthStateChanged(auth,function(u){cb(u&&!u.isAnonymous?{email:(u.email||'').toLowerCase(),name:u.displayName}:null)})},
+    getRole:function(u){return F.getDoc(F.doc(db,'admins',u.email)).then(function(s){var r=s.exists()?s.data().role:null;return ['admin','tech','host'].indexOf(r)>=0?r:null}).catch(function(){return null})},
+    listReady:function(){return F.getDocs(F.query(F.collection(db,'surveys'),F.where('status','==','ready'))).then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data())})})},
+    watchGame:function(id,cb){return F.onSnapshot(F.doc(db,'surveys',id,'data','game'),function(s){cb(s.exists()?JSON.parse(s.data().json):null)},function(){cb(null)})}
+  }}
+(async function(){
+  draw();
+  try{B=window.__emceeMock||await firebaseBackend()}catch(e){state.msg=e.message;draw();return}
+  B.onAuth(onUser)})();
+</script>
+</body>
+</html>
