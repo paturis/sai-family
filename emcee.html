@@ -5,40 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>One Sai Family — Emcee view</title>
 <style>
-:root{--navy:#07152b;--panel:#102d4d;--gold:#f4cb73;--white:#f7faff;--muted:#abc1d9;--teal:#64e1d0;--coral:#ff827e;--border:rgba(203,225,247,.18)}
+:root{--navy:#001a32;--panel:#00305d;--gold:#e86c00;--white:#f7fbff;--muted:#abc3d9;--teal:#ff9436;--coral:#ff827e;--border:rgba(203,226,247,.18)}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:linear-gradient(135deg,#071426,#0a1d38);color:var(--white);font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html,body{margin:0;min-height:100%;background:linear-gradient(135deg,#00172d,#002242);color:var(--white);font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:14px 14px 40px}
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
 .k{font-size:10px;letter-spacing:.2em;font-weight:900;color:var(--gold)}
 .small{font-size:12px;color:var(--muted)}
-button{font:inherit;font-weight:800;border:1px solid var(--border);border-radius:10px;background:#153354;color:var(--white);padding:9px 12px;font-size:13px;cursor:pointer}
-button.gold{background:var(--gold);color:#152a3f;border-color:var(--gold)}
-.card{background:rgba(16,45,77,.8);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+button{font:inherit;font-weight:800;border:1px solid var(--border);border-radius:10px;background:#033666;color:var(--white);padding:9px 12px;font-size:13px;cursor:pointer}
+button.gold{background:var(--gold);color:#062b4e;border-color:var(--gold)}
+.card{background:rgba(0,48,93,.8);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
 h1{font-size:22px;margin:0 0 6px}
 .score{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.team{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#0f2b49}
+.team{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#002d58}
 .team.ctl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
 .team b{display:block;font-size:12px;color:var(--muted)}.team span{font-size:30px;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums}
-.ctag{font-size:10px;background:var(--gold);color:#152a3f;border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:900;vertical-align:middle}
+.ctag{font-size:10px;background:var(--gold);color:#062b4e;border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:900;vertical-align:middle}
 .cat{font-size:11px;letter-spacing:.14em;font-weight:900;color:var(--gold)}
 .q{font-size:24px;font-weight:800;line-height:1.2;margin:6px 0 10px}
-.cue{font-size:13px;color:#cfe0ef;background:rgba(244,203,115,.08);border-left:3px solid var(--gold);padding:8px 10px;border-radius:6px;margin-bottom:12px}
-.ans{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:#0d2745}
-.ans .rk{width:26px;height:26px;border-radius:7px;background:#16406a;display:grid;place-items:center;font-weight:900;font-size:13px}
+.cue{font-size:13px;color:#cfe0ef;background:rgba(232,108,0,.08);border-left:3px solid var(--gold);padding:8px 10px;border-radius:6px;margin-bottom:12px}
+.ans{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:#002a52}
+.ans .rk{width:26px;height:26px;border-radius:7px;background:#004280;display:grid;place-items:center;font-weight:900;font-size:13px}
 .ans .t{flex:1;font-weight:700;font-size:16px}.ans .p{font-weight:900;color:var(--gold);min-width:34px;text-align:right}
-.ans.on{background:#0f4a46;border-color:#1b9c96}.ans.on .st{color:var(--teal)}
+.ans.on{background:#552700;border-color:#ae5100}.ans.on .st{color:var(--teal)}
 .st{font-size:11px;font-weight:800;color:var(--muted);min-width:78px;text-align:right}
-.strikes{display:flex;gap:6px;margin:10px 0}.strikes i{font-style:normal;width:34px;height:34px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--border);color:#47607a;font-weight:900}
+.strikes{display:flex;gap:6px;margin:10px 0}.strikes i{font-style:normal;width:34px;height:34px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--border);color:#25629c;font-weight:900}
 .strikes i.on{background:#702d3b;border-color:#a44d5b;color:#ffb3a9}
 .banner{padding:10px 12px;border-radius:10px;background:rgba(112,45,59,.55);border:1px solid #ff8a8a;color:#ffd6cf;font-weight:900;text-align:center;margin-bottom:10px}
-.ok{padding:8px 12px;border-radius:10px;background:rgba(100,225,208,.12);border:1px solid rgba(100,225,208,.4);color:var(--teal);font-weight:800;font-size:13px;margin-top:8px}
+.ok{padding:8px 12px;border-radius:10px;background:rgba(255,148,54,.12);border:1px solid rgba(255,148,54,.4);color:var(--teal);font-weight:800;font-size:13px;margin-top:8px}
 .fq{padding:10px 0;border-top:1px solid var(--border)}.fq:first-child{border-top:0}.fq .t{font-weight:800;margin-bottom:4px}.fq .a{font-size:13px;color:#cfe0ef}
 .list button{width:100%;text-align:left;margin-bottom:8px;padding:12px}
-.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#64e1d0;margin-right:6px;animation:p 1.6s infinite}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff9436;margin-right:6px;animation:p 1.6s infinite}
 @keyframes p{50%{opacity:.25}}
 @media(prefers-reduced-motion:reduce){.live{animation:none}}
-</style>
+.sssio-logo{display:inline-block;flex:none;width:44px;height:44px;border-radius:50%;background:#fff url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB5CAMAAADF5hVFAAAAkFBMVEX8+/uQqcwsXKDxnFX7+/z7+/zn183pdBtIbqr3yqVgh7m8zOEAK4TtizAAGnp+oce4uP8AAP//v78AAAD+/f0BSpbpdgIAOoz+/v7oagAHUZnyqWtPd7D959LL1+c1Zqbvl1COp8v81rL6tXTp6/Dshi9nibp3lsL6xJPa4+/0uYqnutezxNz8/Pz8/PsmVpw0YeGlAAAAMHRSTlNh/v7+sC3+/v7+/v7/////AwEEAP7//v8F//7+/v7+/v7+/v7+/v7+/v7+/v7PkP7SI6FGAAAQrklEQVR42r1bCXeDOo8Fsi/tezM1cQBjIGEJS8L//3cjeQGbkLbpzDc+p22agC+StVzZivP17jjjj/NY3gmM+/LhnNWb7w3nXViAcJbEGktHvv+fBEZYFDVvK5bAYFVbo+DO20I7b+KeUdqW+ZT6YsBf5qLUqzeRnW9UOvOeAxhZj6ChBMY/tM/gbefVPe9KfD5Pb/oXcXlCNageoU8TLpB/muFn4PPqrG419fwALftTWCU3CP0wkdWtaqJfAp+/VuAojnSU8/AmyOtS/8WglSnzWTqdA073YvFfADvaUc4aWuGGr4BDAxnvOGunc94EjqOLiBAPCQ2aAz2/xkVk0PZZXIqwIr5covXbwLtNcEpveLeCXhJuLerMS06WEvaB993SU7Bp3gR+kCY4nYLgFMWoLRBjRch2wKHjUlPjdSIvxXWKI7z7FDS2yf0S+ITYKUDfVyCwVDTghEmZJZSBY/F9wrOSJT6VynbJ/WsFSo7TQN3+Z2CEjlDfhHjosF7JS0bynHiMJJRkXgcfHnzX8xG8FxeSKBhu/l8Aw90btLMOBC4hMHeJR9iRZFsEdunxUPt9QkrKMsBu0aI2xq3vAjvkNt4N94PQDID3rktAaoAhrpSY+rAEYM8+7QhomxFytW58H/hi3n8qCBHmc0zInoY5pCd/TxIfgEME5/ha2EBOCgt4974fTyTulPHC/D7nGekZCVFi1HJCapKDSnyUO7JufNePVyQ3BQ5uKJvwni736YEf89ojhxbAGPyUIPCahNKud5aq4jdDJoSpwgS+gFyh8BgAwSXd8mR74KXvl8SjHJaYc1QJ3dtrBEt0fgMYws+dpIGlMaaChAeL7CXCeWTswMyEGq/Ek21JbD5wSu7vAdv+hBrb6vDUz2QmCFpdooJXbBv18gUzeSXxxLoM4Fdp0Z8DBts6/xpYEAdc5GBO1WNeoDpMmymLmcDBhqBtzRIRZ54k4SI3GwiXgTauPR1ZlojXHoPhJaHIGPozsL2LDvLBCXLT/Xyep17OM+x55Ui2DsF+FxUiyWh3QlQ/qTo+suq6q7a+wsacfBNprYh2sfwcqMzq32doZ0qbVQonmAiITOYiT6wlqwMym5OnkSPhFU/ViQwhScQ4x10wmZfAuLQihXcV6zEcJMxd4+0RLpYQtqoNuNvV+KeuQlxxNA2Rw3nGEpyjZ1Wn6IQltGPTZpCWl+GQ28F8PJRwXaxJefQrS9jLqbhYclf+kYlLSZ55vjFJWHJBvkyhHTNcgbh16Y+2IrXnV7japNua0sbN7hoV0UTjrCWxeAIRWcJwsEaf1VLoZ2BZnWS+SdczRdf7zgaIorjZBJvoVKyjoognC971Yo7QIEhoHEAFlwayMzovqLk0YWnbaj+FEGyOdHNaCGqSotNEa1vhVBl471ZWtQG52oifCvj8L8q7Nekr8ORjVikyxay5r8EHRPIibaI0DYrUNvNSpTFGukNGR4lDukWZtYU5RnnCLNpMvUPOKSvxpSutSSs1BmE3G9BydGqCtBhsTP6VaIyUn2WtnJ96mS+RBz7ijKVDqUOEHG3XZznLmWTqYt7BfdaLTZQuIOWDyM0lVg/UqAfAWEN5+elX4Am6mtyjzPuxsHCGBVZlgl6hrKtC38WnwdpEqXg9GvXluogWi+tlN743PJeLN/HW87MaVxxg+22t+a9StqMFzlWMl64AT+x+UrftrfWNo1FkQF1E0SIaffkam+tMq6wifFszmqyT+lC3QnjgZEpkRwo82MSW1+D8qB7S+SyHNxPTew2XKsSIZj8EKgRxLC+PRw4iU7d2y75SSURREscSOMkqDIooZdl3eY6WVZPZEW1EEormP8XpvJxuayREIff6Fli/GLUSWQIvVQEKi89ZgsSGcY6lSagM+nnmWyTGLZ7/HCwGbs3dPuOoRuD/ni5mZaZ0JKckiXKh8lCDTpi7B8lrWYdZQ60oZiw5Tql8Zze5EInDlrU50uEkS7JcFZsekbzTkZqWbyZ13ZVlK4JMx9heVJ6zIz1JijACTwcH79iTDHggQ56/ZrSTdJBLXTsyeIg0T3nlZej/ngtVElwqbOHZW5SqF2jXtqoNw8bw6/ker0BxtOTHDGyNSqrwGICX0qYpz+inD6ZVtXTvu50UONazqfhxs606N968XvQzwi1qodYM8Pt6TRIm/XQPpSxqGdPSXVI56nGIr4BXZ2X32TFRgyHgzUS+3VTUlKqOx0807k2+AAFZy1iG68iybQlxkArmfV9pYGlb4PKszCBeIc/gFTwxPaiZLGTpQbJSCeQn4q3rzr6ai/gFeRwq+OSQI8NQ1nUegYWt7zvOO1eETbBCWOupSUvkSyPtC9dYWtbtYuCaUYS6hyNYKqx15Wflp3Cd3gJWZcAeHlAx5izxxyA9pCaBLNe8KT4+iusQsyRubJIhePQegmXNjhgJW5LXE+DVHUMcyseRLPqHruz7PJz1pTFDid2ZIXA9y0uEj4ZlVWYHtGVgfyyRBqeB/+suUnFYujzHNMgyXudQD/eTicTW1+AwkQW8Rh48jWJQZoUHUh8gJHn+8fjZoiczyUOUOwnfxgKBwWqzf0pWapu2qYfhqDYwuND16fK9T/9ZU3rETMsyqAIykWSXRuTqJC0UtVdJuLwkGya9aHZzudjAi+Hf9cW2BrXIrAb1wQuv5m2ZoaG3RgDRyUmGceAOR5onWBVo4Nv1ertM01Mg6l97rPHKAfgAYlRute0VRw+rMSM7qv5nAxWFMNlV2ZNtXawp0Z2mwM+PJ6y4PXDONOUTtOKsgEWw7kaid9xmXZuIZ5sY18WMxVPg+HqJn7MyBRdhZT3qU2laAQ95EUfXZm4FzxiSb4cA/vj+GtAx31LKxpXUWVFzrqUhcpW5HXfFNd+ND7W58t1I0FQTv97TUeDll0n2ViOrDoEf0aMmW3EsyGs8vtSjQBpgSjxzqaBeYFaumhpXeGUAi1Ue1OHWYPp7RT5ut9tOEQ94eRuWPb9EixSotbGu6nO8dAcvYynxvioZI1qb9cDonbFyOih9QFg/4D/fqjpeXJFyXRfxD6p2awiDtdo16eQevlXCrJCgyRICOBra//fGFW2QB2yin4wL/beXwEgcV3YJo4qYVpQRGVN7R8/E1ghczUcK46OZ+8wkuWJtmXDi1jwZcayTF46lLdW1Kp96sRFB8lRSnzQ248fEk7lZA/b2mZhjbEQ8BF/RsKHY9Tbi1s6aVQNbz7azY1c3Vqm0zEWp+FyYfwlcnZJxH2HgAbExXayzYJRCpbhII820Y+MR10OSkNsRkCuk9h5fT4W52IjYCVvhSD5weIODjmFR8SkgPQAKpSqAa4Y3XqVfJWIaP3ER9rrZmZsR2o9xIwLyDR4U4Qp22T9VlU2N5aZ5JLmmQYDA8Fun4Ut0m14Pldg/WSd8v9kEInsPmxHOiCv3icfdsRneo39dTg2UqJsTFKrNaWd+Mn8fVDxi7sWI7AwbL8V43nMqombX2HsqsUnroyYoUDfNpggaXB69BLFt1jFME32cxtOgYkAWx/u4vvYZRhBs0klMig2yd40+gibebOIbKMgk85N78nQTBNbEAvks8/F/oz0vrJMEscVNuNfaNeJAMq9FEWCWKMjpQ9Xm18ukoCStB/XAbTrvgmjqIyJHNIObUZoQq4YZyO01BeAILIsEH9q6BmRtgoxijHxCTmUccc54XNnM4OJmm6hhRke56MiM65buTqcdPPCHJnyjzFd0jTXu/ZTzc0PEdpAExNPPIr0nkpjrdlnYYQsqCSt4jcixqsxFnfukzTUus4OKLiYfFUTvi5thM0bcVIzohoF5t8PwfYvkexhWnsKl4MjF6Wl6gAVPenqkC+GadI7VhJA3ltsPTZpedunplO4uadrIbYnYRtaHNZCD1zMKPTsPuaExWX7PHw8ZLJ4unn63CZp0E12baLNogs1uZF+XcSs1HB89tV0Vt4qWCAx+XhjYsAbZSHapvWUMbhfcis2uWNzSj4/0lha7YAOWa9QUZl6Su3mjDWFwalCCh/O1eshsuiikyjYpIVYPgrU/vjidmsXmGhWNOCQJmmLRgNig9XiGAfhqN0/EEQRdyIz+WH05RudEvt41zTVaT7ouTO51aW5NGu1uJ+2eAbzcXVN4e2dv7FndEjEsS7Nb50aPh6N7RR738b6t3WaxHbJTfInQsjAzaWCRocC+oks+ZCdR9NItD4eeBT3uD93V4pjdMY7zeCyXpLYP7sZtVFjb5gq4Ek6OD0ymaQNZpdgYuHggc9DnfjU2nD0cx+zjcazOHJGvNNsUVUVoypyCXMBqr1fwY/iNI7rt8P/oCrpILVzOj34bKvNyJi1Ak+MfMZaGK3SyigyhvNXFw2CdJ/tVgCkDK8REdm2AmKyrtUsu1eTfnS3eVckq6lS1mRwi24awG12jbwZG6E7t8VfZFuK8f8RdK7378O3ZIgJ7QwcN7iqq02lzd/H1KNUqwWPWYM0tI6Xc1vkFsK5YPYm7560UGjeMfhhtr3SFW1uJfyzVychbwBCxtmLPua3roU+t+w62G3vbmFiurE9a7U/vqJpzrHaqo68PrRHafQXrDrCMYWOIR/0hcCY/rzF8fB/2Q/KshyAGi7vN96Nj79unc9y824fD4XmIGaLPAbluh7Ov+08H18YxAbYhZATpT7sluqSXJ4ZJ5Xa1gM/rzq0Sf6h7KEuQtXTUy0me90Nv23OLgjPT9DKkFrij90gOCgfldf2kiYuLqmzoycBfXkfcY5Uned3TKguHQ8qZhp85YCO3gDXBHKADTlxySMZkF0qK4A2HtfgEJcGtlpBsW1n9jenJ+QXwmZgdEPsSLIpswVgqqNS4kTpKrIj3Yx4rD1VPss9qT9ek3h66MUFt59pfnLneE6MpEJ4bFM5FC9Vnkhnpg0PBODwJVqGgZheurOB6j5rZzZ3rQnHmGoyI3d3CQd1HVx2mjw0f5HQadwTx8DQjoH541J6U5u39bIukM9vnY/dB7vGQLD9U5hKAPnfAPwZWSGsONoTCJnXFQrtr8n4+/wYYCe920ugKMyaf5mx7wfs2w+EvXJDjg4GTtYnVrprM94TOtdx8WVxAtQsQvjfVl+sdeuWsoNCDMLmnpmA+32c03+tDTDKgmFc7pB5hWZI5BoOl00P+3CEqK4Lf9fpoZWdTZOqNpt4O5cFGU1lsZZvpeXJfNd++bvrNJioLx6DZjhwd+Y7cHguT5+ZnLGCc9xrJHCQTsz2+tF+btQEi857OdF1D3mhf4r5s7EbkmtHnBm66z+2aRHC8kk4bvkFcbJVxvs5vAX/Jvh/wDCoPSdRRCUUmZfd8yqOYw3Z6ZdKSb3Bf99CrTqfDvpcJCH95olnoPmkWDXYEiwFeeuOV4b4jk+ae3zfvf32tRGnDs2rP2L4S22RkuYKQurHKTqjwZTsWd+WVmbryuy9PON9/CWRlVjbYELYSBNisqEHTyC9Wjn3lY/X910Wcn75/slrh915gLB+IKr8sYe5dQEWuVtK88vzTt1Scn7/6MvlfZGzbncSb519+M+O3X0kZKo+hAsGMHZtlvOY15pU/fj/ld9+Fsb+ogbE8MiLX6nx+cen/4deOBl6mJc5fdW7/J4CRK8gtAdwtO5//v4BlQNVni86fBP4bsGx4k4pe/g33r8Co7HUQXGbp1H8QWHLRW0PI6o8C/xVYf0HI+Svun4El8t9x/w6MBvb4O+7X/wAsVtrYhlPvZgAAAABJRU5ErkJggg==) center/88% no-repeat;box-shadow:0 2px 10px rgba(0,0,0,.3)}.sssio-logo.big{width:56px;height:56px}.sssio-logo.xl{width:96px;height:96px}.sssio-logo.corner{position:fixed;left:50%;transform:translateX(-50%);bottom:1vh;width:clamp(36px,6.5vh,76px);height:clamp(36px,6.5vh,76px);z-index:5}.r0-brand{display:flex;align-items:center;gap:12px}</style>
 <script src="firebase-config.js"></script>
 <script>/* games.js - the game registry shared by the host console (index), the emcee view and the projector display.
    Every game is a plug-in with the SAME contract:
@@ -57,7 +57,10 @@ h1{font-size:22px;margin:0 0 6px}
 'use strict';
 var G={};window.GAMES=G;
 G.order=[];
-G.register=function(g){G[g.id]=g;if(G.order.indexOf(g.id)<0)G.order.push(g.id)};
+G.adapters={};
+G.register=function(g){G[g.id]=g;if(G.order.indexOf(g.id)<0)G.order.push(g.id);if(g.toCommon)G.adapters[g.id]={toCommon:g.toCommon,fromCommon:g.fromCommon}};
+/* Transfer between shows: item -> common {text,answer,answers,hint,category,pts,tags,source} -> item of the other show */
+G.convert=function(item,from,to){var a=G.adapters[from],b=G.adapters[to];if(!a||!b)return null;var c=a.toCommon(item),o=b.fromCommon(c);o.tags=(c.tags||[]).slice();return o};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 G.esc=esc;
 var clone=function(o){return JSON.parse(JSON.stringify(o))};
@@ -67,29 +70,29 @@ function mkTeams(n,old){var a=[];for(var i=0;i<n;i++)a.push({name:(old&&old[i]&&
 function leader(teams){var m=Math.max.apply(null,teams.map(function(t){return t.score})),w=teams.filter(function(t){return t.score===m});return w.length===1?w[0]:null}
 
 /* ---------- shared styles (injected once, used on every page) ---------- */
-var css='.gm{font-family:inherit;color:#f7faff}'+
+var css='.gm{font-family:inherit;color:#f7fbff}'+
 '.gm-score{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 12px}'+
-'.gm-team{border:1px solid rgba(203,225,247,.2);border-radius:12px;padding:8px 12px;background:#0f2b49}'+
-'.gm-team.on{border-color:#f4cb73;box-shadow:0 0 0 2px rgba(244,203,115,.5)}'+
-'.gm-team b{display:block;font-size:12px;color:#abc1d9}.gm-team b i{font-style:normal;background:#f4cb73;color:#152a3f;border-radius:9px;padding:0 6px;margin-left:6px;font-size:10px}'+
-'.gm-team span{font-size:30px;font-weight:900;color:#f4cb73;font-variant-numeric:tabular-nums}'+
+'.gm-team{border:1px solid rgba(203,226,247,.2);border-radius:12px;padding:8px 12px;background:#002d58}'+
+'.gm-team.on{border-color:#e86c00;box-shadow:0 0 0 2px rgba(232,108,0,.5)}'+
+'.gm-team b{display:block;font-size:12px;color:#abc3d9}.gm-team b i{font-style:normal;background:#e86c00;color:#062b4e;border-radius:9px;padding:0 6px;margin-left:6px;font-size:10px}'+
+'.gm-team span{font-size:30px;font-weight:900;color:#e86c00;font-variant-numeric:tabular-nums}'+
 '.gm-big .gm-team{padding:1.4vh 1.4vw;border-radius:16px}.gm-big .gm-team b{font-size:clamp(14px,1.8vw,26px)}.gm-big .gm-team span{font-size:clamp(34px,5.4vw,84px)}'+
-'.gm-cat{font-size:11px;letter-spacing:.14em;font-weight:900;color:#f4cb73;text-transform:uppercase}.gm-big .gm-cat{font-size:clamp(12px,1.4vw,20px)}'+
+'.gm-cat{font-size:11px;letter-spacing:.14em;font-weight:900;color:#e86c00;text-transform:uppercase}.gm-big .gm-cat{font-size:clamp(12px,1.4vw,20px)}'+
 '.gm-q{font-size:22px;font-weight:800;line-height:1.25;margin:6px 0 10px}.gm-big .gm-q{font-size:clamp(26px,4.2vw,64px);text-align:center;margin:2vh auto;max-width:1200px;line-height:1.15}'+
-'.gm-a{padding:10px 12px;border-radius:10px;background:#0f4a46;border:1px solid #1b9c96;color:#d6fff8;font-weight:800;margin:8px 0}.gm-big .gm-a{font-size:clamp(22px,3.4vw,52px);text-align:center;padding:2vh 2vw}'+
-'.gm-note{font-size:12px;color:#abc1d9;margin:4px 0}.gm-warn{padding:8px 12px;border-radius:10px;background:rgba(112,45,59,.55);border:1px solid #ff8a8a;color:#ffd6cf;font-weight:800;margin:8px 0}'+
-'.gm-grid{display:grid;gap:6px;margin:8px 0}.gm-cell{padding:10px 4px;border-radius:8px;border:1px solid rgba(203,225,247,.2);background:#16406a;color:#f4cb73;font-weight:900;font-size:18px;text-align:center;cursor:pointer;font-family:inherit}'+
-'.gm-cell.used{background:#0b1f36;color:#2f4a66;cursor:default;border-color:rgba(203,225,247,.08)}.gm-head{padding:10px 4px;background:#0d2745;border-radius:8px;text-align:center;font-weight:900;font-size:13px;color:#fff;border:1px solid rgba(203,225,247,.2);display:flex;align-items:center;justify-content:center}'+
+'.gm-a{padding:10px 12px;border-radius:10px;background:#552700;border:1px solid #ae5100;color:#ffddbf;font-weight:800;margin:8px 0}.gm-big .gm-a{font-size:clamp(22px,3.4vw,52px);text-align:center;padding:2vh 2vw}'+
+'.gm-note{font-size:12px;color:#abc3d9;margin:4px 0}.gm-warn{padding:8px 12px;border-radius:10px;background:rgba(112,45,59,.55);border:1px solid #ff8a8a;color:#ffd6cf;font-weight:800;margin:8px 0}'+
+'.gm-grid{display:grid;gap:6px;margin:8px 0}.gm-cell{padding:10px 4px;border-radius:8px;border:1px solid rgba(203,226,247,.2);background:#004280;color:#e86c00;font-weight:900;font-size:18px;text-align:center;cursor:pointer;font-family:inherit}'+
+'.gm-cell.used{background:#002241;color:#154c80;cursor:default;border-color:rgba(203,226,247,.08)}.gm-head{padding:10px 4px;background:#002a52;border-radius:8px;text-align:center;font-weight:900;font-size:13px;color:#fff;border:1px solid rgba(203,226,247,.2);display:flex;align-items:center;justify-content:center}'+
 '.gm-big .gm-cell{font-size:clamp(20px,3.6vw,56px);padding:2.4vh 0}.gm-big .gm-head{font-size:clamp(12px,1.7vw,26px);padding:1.6vh .4vw}'+
-'.gm-timer{font-size:28px;font-weight:900;color:#f4cb73;font-variant-numeric:tabular-nums}.gm-timer.u{color:#ff827e}.gm-big .gm-timer{font-size:clamp(34px,5vw,80px)}'+
-'.gm-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}.gm-row label{font-size:12px;color:#abc1d9;display:flex;gap:6px;align-items:center}'+
-'.gm-row input,.gm-row select{font:inherit;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid rgba(203,225,247,.3);background:#0b2341;color:#fff;width:auto}'+
-'.gm-b{font:inherit;font-weight:800;font-size:13px;padding:8px 12px;border-radius:9px;border:1px solid rgba(203,225,247,.25);background:#153354;color:#f7faff;cursor:pointer}.gm-b.gold{background:#f4cb73;color:#152a3f;border-color:#f4cb73}.gm-b.red{background:#702d3b;border-color:#a44d5b}.gm-b.grn{background:#0f4a46;border-color:#1b9c96}'+
-'.gm-sound{font-size:clamp(46px,12vw,200px);font-weight:900;color:#f4cb73;text-align:center;line-height:1;letter-spacing:.04em;margin:1vh 0;text-transform:uppercase}.gm-chain{display:flex;flex-direction:column;gap:6px;margin-top:8px}'+
-'.gm-link{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid rgba(203,225,247,.2);background:#0d2745}.gm-link.bad{opacity:.65;border-color:#a44d5b}.gm-link small{color:#abc1d9}.gm-big .gm-link{font-size:clamp(14px,2vw,30px);padding:1vh 1vw}'+
-'.gm-win{margin:3vh auto;text-align:center;padding:3vh 3vw;border-radius:20px;background:rgba(244,203,115,.1);border:2px solid rgba(244,203,115,.5);max-width:900px}.gm-win h2{font-size:clamp(28px,5vw,76px);color:#f4cb73;margin:6px 0}'+
-'.gm-sug{display:flex;gap:6px;flex-wrap:wrap}.gm-sug span{background:#16406a;border-radius:14px;padding:3px 10px;font-size:12px}'+
-'.gm-sec{border:1px solid rgba(203,225,247,.15);border-radius:12px;padding:10px 12px;margin:10px 0;background:rgba(10,29,56,.5)}';
+'.gm-timer{font-size:28px;font-weight:900;color:#e86c00;font-variant-numeric:tabular-nums}.gm-timer.u{color:#ff827e}.gm-big .gm-timer{font-size:clamp(34px,5vw,80px)}'+
+'.gm-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}.gm-row label{font-size:12px;color:#abc3d9;display:flex;gap:6px;align-items:center}'+
+'.gm-row input,.gm-row select{font:inherit;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid rgba(203,226,247,.3);background:#00274c;color:#fff;width:auto}'+
+'.gm-b{font:inherit;font-weight:800;font-size:13px;padding:8px 12px;border-radius:9px;border:1px solid rgba(203,226,247,.25);background:#033666;color:#f7fbff;cursor:pointer}.gm-b.gold{background:#e86c00;color:#062b4e;border-color:#e86c00}.gm-b.red{background:#702d3b;border-color:#a44d5b}.gm-b.grn{background:#552700;border-color:#ae5100}'+
+'.gm-sound{font-size:clamp(46px,12vw,200px);font-weight:900;color:#e86c00;text-align:center;line-height:1;letter-spacing:.04em;margin:1vh 0;text-transform:uppercase}.gm-chain{display:flex;flex-direction:column;gap:6px;margin-top:8px}'+
+'.gm-link{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid rgba(203,226,247,.2);background:#002a52}.gm-link.bad{opacity:.65;border-color:#a44d5b}.gm-link small{color:#abc3d9}.gm-big .gm-link{font-size:clamp(14px,2vw,30px);padding:1vh 1vw}'+
+'.gm-win{margin:3vh auto;text-align:center;padding:3vh 3vw;border-radius:20px;background:rgba(232,108,0,.1);border:2px solid rgba(232,108,0,.5);max-width:900px}.gm-win h2{font-size:clamp(28px,5vw,76px);color:#e86c00;margin:6px 0}'+
+'.gm-sug{display:flex;gap:6px;flex-wrap:wrap}.gm-sug span{background:#004280;border-radius:14px;padding:3px 10px;font-size:12px}'+
+'.gm-sec{border:1px solid rgba(203,226,247,.15);border-radius:12px;padding:10px 12px;margin:10px 0;background:rgba(0,34,66,.5)}';
 if(typeof document!=='undefined'){var st=document.createElement('style');st.textContent=css;(document.head||document.documentElement).appendChild(st);
   setInterval(function(){var els=document.querySelectorAll('.gm-timer');for(var i=0;i<els.length;i++){var e=els[i],end=+e.getAttribute('data-end')||0,s=+e.getAttribute('data-secs')||0,l=end?Math.max(0,Math.ceil((end-Date.now())/1000)):s;e.textContent=l+'s';e.className='gm-timer'+(end&&l<=5?' u':'')}},400)}
 function teamBoard(teams,turn,big){return '<div class="gm-score">'+teams.map(function(t,i){return '<div class="gm-team'+(i===turn?' on':'')+'"><b>'+esc(t.name)+(i===turn?'<i>TURN</i>':'')+'</b><span>'+t.score+'</span></div>'}).join('')+'</div>'}
@@ -115,6 +118,9 @@ G.register({
     {k:'source',label:'Source note',t:'text',full:1},
     {k:'tags',label:'Sets / tags (comma separated)',t:'tags',full:1}],
   defaults:{kind:'clue',pts:100},
+  toCommon:function(q){return{text:q.en,answer:q.answer||'',answers:[],hint:'',category:q.category||'',pts:q.pts||100,tags:q.tags||[],source:q.source||''}},
+  fromCommon:function(c){var ans=c.answer||(c.answers&&c.answers.length?c.answers.slice(0,3).map(function(a){return a.en}).join(' / '):'');
+    return{game:'jeopardy',kind:'clue',en:c.text&&c.text.trim()?c.text:(c.hint?'Name the bhajan that begins: '+c.hint:'Name this bhajan.'),answer:ans,category:c.category||'General',pts:c.pts||100,source:c.source||''}},
   row:function(q){return{a:q.en,b:(q.category||'')+(q.kind==='clue'?' · '+q.pts:''),chip:q.kind==='clue'?'Clue':q.kind==='final'?'Final':'Lightning'}},
   summary:function(items){var c={};items.forEach(function(q){c[q.kind||'clue']=(c[q.kind||'clue']||0)+1});return (c.clue||0)+' board clues · '+(c.lightning||0)+' lightning · '+(c.final||0)+' final'},
   validate:function(items){return items.some(function(q){return (q.kind||'clue')==='clue'})?'':'A Jeopardy session needs at least one board clue.'},
@@ -125,7 +131,7 @@ G.register({
     var fin=items.filter(function(q){return q.kind==='final'})[0];
     return{game:'jeopardy',teams:mkTeams(4),cats:cats,final:fin?{cat:fin.category||'Final',q:fin.en,a:fin.answer||'',src:fin.source||''}:null,
       lightning:items.filter(function(q){return q.kind==='lightning'}).map(function(q){return{q:q.en,a:q.answer||'',src:q.source||'',used:false}}),
-      view:'board',cur:null,timerSecs:0,timerEndsAt:0,fin:{step:0,wagers:[],res:[]},lg:{i:-1,reveal:false},lpts:1}},
+      view:'board',cur:null,timerSecs:0,timerEndsAt:0,fin:{step:0,wagers:[],res:[]},lg:{i:-1,reveal:false},lpts:1,buzz:{on:false,secs:10,q:0,open:false,closesAt:0}}},
   act:function(S,a,d){
     var cl=S.cur?S.cats[S.cur.c].clues[S.cur.i]:null;
     if(timerAct(S,a,d))return S;
@@ -133,14 +139,19 @@ G.register({
       case 'nteams':setTeams(S,d.v);break;
       case 'tname':S.teams[+d.i].name=String(d.v||'').trim()||('Team '+(+d.i+1));break;
       case 'adj':S.teams[+d.i].score+=+d.v;break;
-      case 'open':S.cur={c:+d.c,i:+d.i,reveal:false,dd:false,wager:0};S.view='clue';S.timerEndsAt=0;S.timerSecs=0;break;
+      case 'open':S.cur={c:+d.c,i:+d.i,reveal:false,dd:false,wager:0,locked:[],buzzTeam:null};S.view='clue';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false;break;
       case 'reveal':if(S.cur)S.cur.reveal=true;break;
       case 'dd':if(S.cur){S.cur.dd=!S.cur.dd;S.cur.wager=S.cur.dd?cl.pts:0}break;
       case 'wager':if(S.cur)S.cur.wager=Math.max(0,+d.v||0);break;
-      case 'right':if(cl){S.teams[+d.i].score+=S.cur.dd?S.cur.wager:cl.pts;cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0}break;
-      case 'wrong':if(cl){S.teams[+d.i].score-=S.cur.dd?S.cur.wager:cl.pts;if(S.cur.dd){cl.used=true;S.cur=null;S.view='board'}}break;
-      case 'close':if(cl){cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0}break;
-      case 'back':S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;break;
+      case 'right':if(cl){S.teams[+d.i].score+=S.cur.dd?S.cur.wager:cl.pts;cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false}break;
+      case 'wrong':if(cl){S.teams[+d.i].score-=S.cur.dd?S.cur.wager:cl.pts;if(S.cur.dd){cl.used=true;S.cur=null;S.view='board'}else{var wi=+d.i;if(S.cur.locked.indexOf(wi)<0)S.cur.locked.push(wi);S.cur.buzzTeam=null}}break;
+      case 'close':if(cl){cl.used=true;S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false}break;
+      case 'back':S.cur=null;S.view='board';S.timerEndsAt=0;S.timerSecs=0;S.buzz.open=false;break;
+      case 'bzon':S.buzz.on=!S.buzz.on;if(!S.buzz.on)S.buzz.open=false;break;
+      case 'bzsecs':S.buzz.secs=Math.max(2,Math.min(120,+d.v||10));break;
+      case 'bzopened':S.buzz.q=+d.q;S.buzz.open=true;S.buzz.closesAt=+d.closesAt;if(S.cur)S.cur.buzzTeam=null;break;
+      case 'bzclosed':S.buzz.open=false;if(S.cur&&d.team!==undefined&&d.team!==''&&d.team!==null&&+d.team>=0)S.cur.buzzTeam=+d.team;break;
+      case 'bzset':if(S.cur)S.cur.buzzTeam=(d.v===''||d.v==null)?null:+d.v;break;
       case 'final':if(S.final){S.view='final';S.fin={step:0,wagers:S.teams.map(function(){return 0}),res:S.teams.map(function(){return null})}}break;
       case 'fstep':S.fin.step=Math.min(3,S.fin.step+1);break;
       case 'fwager':S.fin.wagers[+d.i]=Math.max(0,+d.v||0);break;
@@ -162,13 +173,16 @@ G.register({
       h+='<div class="gm-cat">Pick a clue</div><div class="gm-grid" style="grid-template-columns:repeat('+Math.max(1,S.cats.length)+',1fr)">'+
         S.cats.map(function(c){return '<div class="gm-head">'+esc(c.name)+'</div>'}).join('')+
         Array.from({length:rows},function(_,r){return S.cats.map(function(c,ci){var k=c.clues[r];return k?(k.used?'<div class="gm-cell used">·</div>':btn(g,'open',k.pts,' data-c="'+ci+'" data-i="'+r+'"','gm-cell')):'<div></div>'}).join('')}).join('')+'</div>'+
-        '<div class="gm-row">'+(S.lightning.length?btn(g,'lightning','⚡ Lightning round ('+S.lightning.length+')'):'')+(S.final?btn(g,'final','🏁 Final clue','','gold'):'')+btn(g,'done','Finish game &amp; show winner','','grn')+'</div>';
+        '<div class="gm-row">'+btn(g,'bzon',S.buzz.on?'📱 Phone buzzers: ON':'📱 Phone buzzers: off','',S.buzz.on?'grn':'')+(S.buzz.on?'<label>Buzz window <input type="number" min="2" max="120" data-gi="'+g+'" data-act="bzsecs" value="'+S.buzz.secs+'" style="width:60px"> s</label>':'')+(S.lightning.length?btn(g,'lightning','⚡ Lightning round ('+S.lightning.length+')'):'')+(S.final?btn(g,'final','🏁 Final clue','','gold'):'')+btn(g,'done','Finish game &amp; show winner','','grn')+'</div>';
     }else if(S.view==='clue'&&S.cur){
       var c=S.cats[S.cur.c],k=c.clues[S.cur.i];
-      h+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">Source: '+esc(k.src)+'</div>':'')+
+      var bz='';if(S.buzz.on){var bt=S.cur.buzzTeam;bz='<div class="gm-sec"><div class="gm-cat">📱 Phone buzzers</div><div class="gm-row">'+btn(g,'bzopen','🔔 Open buzzers ('+S.buzz.secs+'s)','','gold')+btn(g,'bzlock','Lock now')+
+        '<label>Buzzed first <select data-gi="'+g+'" data-act="bzset"><option value="">—</option>'+S.teams.map(function(t,i){return '<option value="'+i+'"'+(bt===i?' selected':'')+(S.cur.locked.indexOf(i)>=0?' disabled':'')+'>'+esc(t.name)+'</option>'}).join('')+'</select></label></div>'+
+        '<div class="gm-note">'+(S.buzz.open?'Buzzers are OPEN — first phone to buzz wins.':bt!=null?esc(S.teams[bt].name)+' buzzed first.':'Buzzers closed.')+(S.cur.locked.length?' Locked out: '+S.cur.locked.map(function(i){return esc(S.teams[i].name)}).join(', ')+'.':'')+'</div></div>'}
+      h+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">Source: '+esc(k.src)+'</div>':'')+bz+
         '<div class="gm-row">'+btn(g,'reveal',S.cur.reveal?'Answer shown on screen ✓':'Show answer on the big screen',S.cur.reveal?' disabled':'')+btn(g,'dd',S.cur.dd?'Daily Double ON':'Daily Double?','', S.cur.dd?'gold':'')+(S.cur.dd?'<label>Wager <input type="number" min="0" data-gi="'+g+'" data-act="wager" value="'+S.cur.wager+'" style="width:90px"></label>':'')+'</div>'+timerBtns(g,S)+
-        '<div class="gm-note">Correct answer: who gets the points?</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'right','✓ '+esc(t.name),' data-i="'+i+'"','grn')}).join('')+'</div>'+
-        '<div class="gm-note">Wrong answer (deducts points, clue stays open):</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'wrong','✗ '+esc(t.name),' data-i="'+i+'"','red')}).join('')+'</div>'+
+        '<div class="gm-note">Correct answer: who gets the points?</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'right','✓ '+esc(t.name)+(S.cur.buzzTeam===i?' 🔔':''),' data-i="'+i+'"','grn')}).join('')+'</div>'+
+        '<div class="gm-note">Wrong answer (deducts points, clue stays open):</div><div class="gm-row">'+S.teams.map(function(t,i){return btn(g,'wrong','✗ '+esc(t.name)+(S.cur.buzzTeam===i?' 🔔':''),' data-i="'+i+'"','red')}).join('')+'</div>'+
         '<div class="gm-row">'+btn(g,'close','No one got it — close clue')+btn(g,'back','← Back to board (keep clue)')+'</div></div>';
     }else if(S.view==='final'){
       h+='<div class="gm-sec"><div class="gm-cat">Final clue · '+esc(S.final.cat)+'</div>'+
@@ -185,7 +199,7 @@ G.register({
   host:function(S){
     var g='<div class="gm">'+teamBoard(S.teams,-1);
     if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];
-      g+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE (wager '+S.cur.wager+')':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">'+esc(k.src)+'</div>':'')+(S.cur.reveal?'<div class="gm-note">Answer is showing on the big screen.</div>':'')+'</div>'}
+      g+='<div class="gm-sec"><div class="gm-cat">'+esc(c.name)+' · '+k.pts+(S.cur.dd?' · DAILY DOUBLE (wager '+S.cur.wager+')':'')+'</div><div class="gm-q">'+esc(k.q)+'</div><div class="gm-a">Answer: '+esc(k.a)+'</div>'+(k.src?'<div class="gm-note">'+esc(k.src)+'</div>':'')+(S.cur.reveal?'<div class="gm-note">Answer is showing on the big screen.</div>':'')+(S.buzz.on?'<div class="gm-note">🔔 '+(S.buzz.open?'Buzzers open':S.cur.buzzTeam!=null?esc(S.teams[S.cur.buzzTeam].name)+' buzzed first':'Buzzers closed')+'</div>':'')+'</div>'}
     else if(S.view==='final'){g+='<div class="gm-sec"><div class="gm-cat">Final clue · '+esc(S.final.cat)+' · step '+S.fin.step+'/3</div><div class="gm-q">'+esc(S.final.q)+'</div><div class="gm-a">Answer: '+esc(S.final.a)+'</div></div>'}
     else if(S.view==='lightning'){var L=S.lightning[S.lg.i];g+='<div class="gm-sec"><div class="gm-cat">Lightning · '+(S.lg.i+1)+'/'+S.lightning.length+'</div><div class="gm-q">'+esc(L.q)+'</div><div class="gm-a">Answer: '+esc(L.a)+'</div></div>'}
     else if(S.view==='done'){var w=leader(S.teams);g+='<div class="gm-win"><div>FINAL</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2></div>'}
@@ -196,13 +210,13 @@ G.register({
     var D={game:'jeopardy',title:sv&&sv.name||'',view:S.view,teams:S.teams.map(function(t){return{name:t.name,score:t.score}}),
       cats:S.cats.map(function(c){return{name:c.name,clues:c.clues.map(function(k){return{pts:k.pts,used:k.used}})}}),
       timerSecs:S.timerSecs||0,timerEndsAt:S.timerEndsAt||0,updatedAt:Date.now()};
-    if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];D.cur={cat:c.name,pts:k.pts,q:k.q,a:S.cur.reveal?k.a:null,dd:S.cur.dd,wager:S.cur.dd?S.cur.wager:0}}
+    if(S.view==='clue'&&S.cur){var c=S.cats[S.cur.c],k=c.clues[S.cur.i];D.cur={cat:c.name,pts:k.pts,q:k.q,a:S.cur.reveal?k.a:null,dd:S.cur.dd,wager:S.cur.dd?S.cur.wager:0};if(S.buzz.on)D.buzz={open:S.buzz.open,closesAt:S.buzz.closesAt,secs:S.buzz.secs,team:S.cur.buzzTeam!=null?S.teams[S.cur.buzzTeam].name:null,locked:S.cur.locked.map(function(i){return S.teams[i].name})}}
     if(S.view==='final'&&S.final)D.final={cat:S.final.cat,q:S.fin.step>=2?S.final.q:null,a:S.fin.step>=3?S.final.a:null,step:S.fin.step};
     if(S.view==='lightning'){var L=S.lightning[S.lg.i];D.lg={n:S.lg.i+1,of:S.lightning.length,q:L.q,a:S.lg.reveal?L.a:null}}
     return D},
   display:function(D){
     var h='<div class="gm gm-big">'+teamBoard(D.teams,-1,true);
-    if(D.view==='clue'&&D.cur){var c=D.cur;h+='<div class="gm-cat" style="text-align:center">'+esc(c.cat)+' · '+c.pts+(c.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(c.q)+'</div>'+(c.a?'<div class="gm-a">'+esc(c.a)+'</div>':'')+'<div style="text-align:center">'+timerHtml(D)+'</div>'}
+    if(D.view==='clue'&&D.cur){var c=D.cur;h+='<div class="gm-cat" style="text-align:center">'+esc(c.cat)+' · '+c.pts+(c.dd?' · DAILY DOUBLE':'')+'</div><div class="gm-q">'+esc(c.q)+'</div>'+(D.buzz&&D.buzz.open?'<div class="gm-warn" style="text-align:center;font-size:clamp(18px,2.6vw,40px)">🔔 BUZZERS OPEN <span class="gm-timer" data-end="'+D.buzz.closesAt+'" data-secs="'+D.buzz.secs+'">'+D.buzz.secs+'s</span></div>':D.buzz&&D.buzz.team?'<div class="gm-a" style="text-align:center">🔔 '+esc(D.buzz.team)+' buzzed in first!</div>':'')+(c.a?'<div class="gm-a">'+esc(c.a)+'</div>':'')+'<div style="text-align:center">'+timerHtml(D)+'</div>'}
     else if(D.view==='final'&&D.final){var f=D.final;h+='<div class="gm-cat" style="text-align:center">Final clue</div><div class="gm-q">'+esc(f.cat)+'</div>'+(f.q?'<div class="gm-q" style="font-size:clamp(20px,3vw,44px)">'+esc(f.q)+'</div>':'')+(f.a?'<div class="gm-a">'+esc(f.a)+'</div>':'')}
     else if(D.view==='lightning'&&D.lg){h+='<div class="gm-cat" style="text-align:center">Lightning round · '+D.lg.n+' of '+D.lg.of+'</div><div class="gm-q">'+esc(D.lg.q)+'</div>'+(D.lg.a?'<div class="gm-a">'+esc(D.lg.a)+'</div>':'')}
     else if(D.view==='done'){var w=leader(D.teams);h+='<div class="gm-win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It is a tie!')+'</h2></div>'}
@@ -227,6 +241,8 @@ G.register({
     {k:'category',label:'Deity / theme (optional)',t:'text'},
     {k:'tags',label:'Sets / tags (comma separated)',t:'tags',full:1}],
   defaults:{kind:'bhajan'},
+  toCommon:function(q){return{text:'',answer:q.en,answers:[],hint:q.hint||'',category:q.category||'',pts:0,tags:q.tags||[],source:''}},
+  fromCommon:function(c){return{game:'antakshari',kind:'bhajan',en:(c.answer||c.text||'').trim(),hint:c.hint||'',category:c.category||''}},
   row:function(q){return{a:q.en,b:q.hint||q.category||'',chip:'Bhajan'}},
   summary:function(items){return items.length+' bhajans in the helper list (teams may sing any bhajan)'},
   validate:function(){return ''},
@@ -292,7 +308,7 @@ G.register({
 });
 })();
 </script>
-</head>
+<link rel="icon" type="image/png" href="data:image/png;base64,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"></head>
 <body>
 <div class="wrap" id="app"></div>
 <script>
@@ -301,7 +317,7 @@ var FB='https://www.gstatic.com/firebasejs/10.12.2/';
 var app=document.getElementById('app'),B=null,state={stage:'login',user:null,surveys:[],sv:null,S:null,unsub:null,msg:''};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 
-function topBar(){return '<div class="top"><div><div class="k">ONE SAI FAMILY · EMCEE VIEW</div><div class="small">'+(state.user?esc(state.user.email)+' · read-only':'Read-only live view of the game board')+'</div></div><div>'+
+function topBar(){return '<div class="top"><div style="display:flex;align-items:center;gap:10px"><span class="sssio-logo"></span><div><div class="k">SSSIO · EMCEE VIEW</div><div class="small">'+(state.user?esc(state.user.email)+' · read-only':'Read-only live view of the game board')+'</div></div></div><div>'+
   (state.sv?'<button data-a="back">Games</button> ':'')+(state.user?'<button data-a="out">Sign out</button>':'')+'</div></div>'}
 function draw(){
   var h=topBar();
