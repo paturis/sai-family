@@ -78,6 +78,21 @@ t = text(r.dom);
 check('emcee: host signs in and sees the ready game', /E2E Retreat/.test(t), t.slice(0, 300));
 check('emcee: no JS errors', consoleErrors(r.log).length === 0, consoleErrors(r.log).join('\n'));
 
+// F. with email sign-in configured, both login screens offer "Email me a link"
+const app2 = await createApp({ dataDir: ':memory:', port: 0, host: '127.0.0.1', publicUrl: 'http://127.0.0.1', webRoot: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'),
+  smtpUser: 'game@example.org', smtpPass: 'x', smtpFrom: 'game@example.org', mailTransport: () => ({ sendMail: async () => {}, verify: async () => true }) });
+const base2 = `http://127.0.0.1:${await app2.listen()}`;
+r = await chrome(base2 + '/');
+t = text(r.dom);
+check('console (email on): offers "Email me a link" and the paste fallback', /Email me a link/.test(t) && /I have a login link instead/.test(t) && /id="loginMail"/.test(r.dom), t.slice(0, 250));
+check('console (email on): no JS errors', consoleErrors(r.log).length === 0, consoleErrors(r.log).join('\n'));
+r = await chrome(base2 + '/emcee.html');
+check('emcee (email on): offers "Email me a link"', /Email me a link/.test(text(r.dom)) && /id="loginMail"/.test(r.dom), text(r.dom).slice(0, 250));
+app2.store.users.upsert('boss@example.org', 'admin');
+r = await chrome(base2 + '/?login=' + app2.auth.createLoginLink('boss@example.org').token);
+check('console (email on): admin sees the Mail ✓ chip', /Mail ✓/.test(text(r.dom)), text(r.dom).slice(0, 300));
+await app2.close();
+
 await app.close();
 fs.rmSync(SCR, { recursive: true, force: true });
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

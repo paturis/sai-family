@@ -11,7 +11,7 @@
   function emit() { var s = status(); statusCbs.slice().forEach(function (cb) { try { cb(s); } catch (e) { console.error(e); } }); }
   function onStatus(cb) { statusCbs.push(cb); try { cb(status()); } catch (e) { console.error(e); } }
 
-  var authCb = null, meUser = null, authError = '';
+  var authCb = null, meUser = null, authError = '', mailOn = false;
 
   async function post(path, body) {
     var r;
@@ -101,7 +101,7 @@
   }
   function asUser(u) { return u ? { email: u.id, name: u.name || u.id, uid: u.id, role: u.role } : null; }
   async function me() {
-    try { meUser = (await post('/api/auth/me')).user || null; } catch (e) { meUser = null; }
+    try { var j = await post('/api/auth/me'); meUser = j.user || null; mailOn = !!j.mailEnabled; } catch (e) { meUser = null; }
     return meUser;
   }
   async function redeem(v) {
@@ -118,6 +118,7 @@
     if (t) {
       try { await redeem(t); } catch (e) { authError = e.message; }
       try { p.delete('login'); var q = p.toString(); history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (e) { /* ignore */ }
+      if (!meUser) await me();   // sign-in failed: still learn whether email sign-in is available
     } else await me();
     cb(asUser(meUser));
   }
@@ -125,6 +126,8 @@
     try { await redeem(v); } catch (e) { authError = e.message; throw e; }
     if (authCb) authCb(asUser(meUser));
   }
+  /** Ask the server to email a sign-in link. Always succeeds from the caller's view (no account enumeration). */
+  async function requestLink(email) { await post('/api/auth/request-link', { email: email }); }
   async function signOut() {
     try { await post('/api/auth/logout'); } catch (e) { /* ignore */ }
     meUser = null;
@@ -133,7 +136,7 @@
 
   window.SrvClient = {
     post: post, rpc: rpc, subscribe: subscribe, connect: connect, close: close, onStatus: onStatus, status: status,
-    authInit: authInit, signIn: signIn, signOut: signOut, parseLogin: parseLogin,
+    authInit: authInit, signIn: signIn, requestLink: requestLink, mailEnabled: function () { return mailOn; }, signOut: signOut, parseLogin: parseLogin,
     me: function () { return meUser; }, authError: function () { return authError; }
   };
 })();

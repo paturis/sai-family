@@ -31,7 +31,7 @@ const personId = (v) => {
  * One method per old `Cloud` operation. The role lists replace the Firestore security rules:
  *   admin = everything, tech = runs the show (no bank edits, no creating/deleting surveys), host = read-only emcee.
  */
-export function createRpc({ store, auth, ai }) {
+export function createRpc({ store, auth, ai, mailer, config }) {
   const M = {
     /* team */
     listTeam: [ADMIN, () => store.users.list().map((u) => ({ email: u.id, name: u.name, role: u.role }))],
@@ -49,6 +49,19 @@ export function createRpc({ store, auth, ai }) {
       return true;
     }],
     loginLink: [ADMIN, (user, email) => auth.createLoginLink(personId(email)).url],
+    /** Email a new person their first sign-in link (valid INVITE_TTL_HOURS, works once). */
+    emailInvite: [ADMIN, async (user, email) => {
+      const id = personId(email);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id)) throw bad('That is not an email address');
+      if (!store.users.get(id)) throw new HttpError(404, 'no_user', 'Add the person first');
+      if (!mailer.enabled) throw new HttpError(503, 'mail_not_configured', 'Email is not set up on the server');
+      const { url } = auth.createLoginLink(id, config.inviteTtlMs);
+      try {
+        await mailer.sendLoginLink({ to: id, url, minutes: Math.round(config.inviteTtlMs / 60_000), invite: true });
+      } catch (e) { throw new HttpError(502, 'mail_failed', e.message); }
+      return true;
+    }],
+    mailHealth: [ADMIN, (user, force) => mailer.health(Boolean(force))],
 
     /* question bank */
     listQuestions: [STAFF, () => store.questions.list()],

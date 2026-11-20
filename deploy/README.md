@@ -31,10 +31,26 @@ phones / projector / tech laptop  ──https──►  your Caddy  ──►  s
    docker compose exec app node src/cli.js login-link ritesh
    ```
    Open the printed link: you are signed in as admin for 30 days on that browser.
-7. **Add the team** in the app (Team tab): add a name, choose the role, and the app shows that person's login link to copy
-   and send (WhatsApp is fine). Each link works **once** and lasts 7 days. 🔗 Login link makes a new one any time.
-   You can also do it on the server: `docker compose exec app node src/cli.js add-user "Ravi" tech`.
+7. **Add the team** in the app (Team tab). Use people's **email addresses**: with email set up (below) the app emails them a
+   sign-in link straight away; otherwise it shows the link to copy and send yourself (WhatsApp is fine).
+   Every link works **once**. You can also do it on the server: `docker compose exec app node src/cli.js add-user ravi@example.org tech`.
 8. **Load the question bank:** Dashboard → Question bank → add the starter questions (same as before).
+
+## Email sign-in (Microsoft 365)
+
+People open the app, type their email, and receive a one-time link (works once, expires in 15 minutes by default). Only
+addresses that are on the Team list get an email, and the page answers identically for everyone else, so it can't be used to
+find out who has an account. Emailed links are random values stored hashed on the server and checked there (single use,
+revocable the moment you remove someone, which a self-contained signed token could not do).
+
+1. Put the mailbox in `.env`: `SMTP_USER`, `SMTP_PASS` (and leave `SMTP_HOST=smtp.office365.com`, `SMTP_PORT=587`).
+2. `docker compose up -d`, then check it works: `docker compose exec app node src/cli.js mail-test you@example.org`.
+   The logs also say `[mail] SMTP smtp.office365.com: ready` or the exact reason it failed, and admins see a `Mail ✓/✗` chip.
+3. **Microsoft may refuse the login.** Microsoft has been switching off password-based SMTP ("basic auth") for Microsoft 365 during
+   2026. If `mail-test` says SMTP AUTH is disabled: ask your Microsoft 365 admin to enable *Authenticated SMTP* for that mailbox
+   (and use an app password if MFA is on), or switch to a different mailbox/provider. Until it works, everything else still does:
+   admins can copy login links from the Team tab or the CLI.
+4. The sender must be the mailbox itself (or one it has "Send as" rights for), set with `SMTP_FROM`.
 
 Roles: **admin** does everything, **tech** runs the show (no bank edits, no creating or deleting surveys), **host** is the
 read-only emcee screen (`/emcee.html`).
@@ -61,7 +77,8 @@ read-only emcee screen (`/emcee.html`).
 | Logs | `docker compose logs -f app` |
 | Restart | `docker compose restart app` |
 | Update to new code | `git pull && docker compose up -d --build` |
-| New login link | `docker compose exec app node src/cli.js login-link <name>` |
+| New login link | `docker compose exec app node src/cli.js login-link <name>` (copy and send it yourself) |
+| Test the email setup | `docker compose exec app node src/cli.js mail-test you@example.org` |
 | Who has access | `docker compose exec app node src/cli.js list-users` |
 | Backup now | `./backup.sh` (copies to `deploy/backups/`; run it before the event and nightly from cron) |
 
@@ -85,7 +102,7 @@ docker compose start app
 ## Security notes
 
 - The container runs as a non-root user with a read-only filesystem, no Linux capabilities, 512 MB / 1 CPU limits.
-- Login links are random 256-bit values, stored hashed, single use. Sessions are `HttpOnly`, `SameSite=Lax`, `Secure` over https.
+- Login links (emailed or copied) are random 256-bit values, stored hashed, single use; emailed ones expire in 15 minutes. Sessions are `HttpOnly`, `SameSite=Lax`, `Secure` over https.
 - Phones can only answer the **current, open** question (1–80 characters, one answer each); buzz order uses the server clock.
 - Hidden answers are never sent to phones or the projector; the full game state goes only to signed-in staff and the emcee.
 - Cross-site requests and cross-site WebSockets are refused. Secrets live only in `.env` and the data volume.

@@ -7,6 +7,7 @@ import { loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { createStore } from './store.js';
 import { createAuth } from './auth.js';
+import { createMailer } from './mail.js';
 
 const config = loadConfig();
 const db = openDb(config.dataDir);
@@ -24,6 +25,7 @@ const usage = () => {
   login-link <name-or-email>                   print a fresh one-time login link (valid 7 days)
   list-users                                   show everyone
   remove-user <name-or-email>                  remove a person and sign them out
+  mail-test <email>                            send a test email (checks your SMTP settings)
   backup <file>                                write a consistent copy of the database`);
   process.exit(1);
 };
@@ -49,6 +51,16 @@ switch (cmd) {
     store.users.remove(norm(args[0]));
     console.log('Removed.');
     break;
+  case 'mail-test': {
+    const to = norm(args[0]);
+    if (!to.includes('@')) usage();
+    const mailer = createMailer({ config });
+    const h = await mailer.health(true);
+    if (!h.ok) { console.error(`SMTP check FAILED (${h.host}): ${h.error}`); process.exitCode = 1; break; }
+    try { await mailer.sendTest(to); console.log(`Sent a test email to ${to} from ${h.from}.`); }
+    catch (e) { console.error(`Could not send: ${e.message}`); process.exitCode = 1; }
+    break;
+  }
   case 'backup': {
     if (!args[0]) usage();
     const out = path.resolve(args[0]);

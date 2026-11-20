@@ -340,6 +340,9 @@ function serverImpl(){
     async saveTeam(email,role){await R('saveTeam',email,role)},
     async deleteTeam(email){await R('deleteTeam',email)},
     async loginLink(email){return R('loginLink',email)},
+    async requestLink(email){await C.requestLink(email)},
+    async emailInvite(email){await R('emailInvite',email)},
+    async mailHealth(force){return R('mailHealth',!!force)},
     async listQuestions(){return R('listQuestions')},
     async saveQuestion(q){return R('saveQuestion',q)},
     async deleteQuestion(id){await R('deleteQuestion',id)},
@@ -847,18 +850,19 @@ const orderQs=a=>[...a.filter(q=>q.kind!=='fast'),...a.filter(q=>q.kind==='fast'
 function bar(extra){
   const here=A.stage;
   return`<div class="r0-top"><div class="r0-brand"><span class="sssio-logo" role="img" aria-label="SSSIO"></span><div><div class="r0-kicker">SSSIO · GAME SHOW CONSOLE</div><div class="r0-sub">${A.sv&&['lobby','collect','tabulate','gate'].includes(here)?'Survey: '+esc(A.sv.name)+' · Contestants wait outside the hall during Round 0':'Create surveys, run the audience round and play the game'}</div></div></div>
-  <div class="r0-top-actions">${Cloud.mode==='memory'?'<span class="r0-chip warn">PRACTICE MODE · this browser only</span>':''}${A.user&&(Cloud.mode==='firebase'||Cloud.mode==='server')?'<span class="r0-chip">'+esc(A.user.email)+' · '+esc(A.role)+(A.realRole&&A.realRole!==A.role?' (preview)':'')+'</span>':''}${viewAsSel()}${Cloud.mode==='server'?'<span class="r0-chip" data-sync></span>'+aiChip():''}${A.sv&&A.sv.code?'<button class="btn small gold" data-a="links">🔗 Links</button>':''}${extra||''}
+  <div class="r0-top-actions">${Cloud.mode==='memory'?'<span class="r0-chip warn">PRACTICE MODE · this browser only</span>':''}${A.user&&(Cloud.mode==='firebase'||Cloud.mode==='server')?'<span class="r0-chip">'+esc(A.user.email)+' · '+esc(A.role)+(A.realRole&&A.realRole!==A.role?' (preview)':'')+'</span>':''}${viewAsSel()}${Cloud.mode==='server'?'<span class="r0-chip" data-sync></span>'+aiChip()+(A.role==='admin'?mailChip():''):''}${A.sv&&A.sv.code?'<button class="btn small gold" data-a="links">🔗 Links</button>':''}${extra||''}
   ${['lobby','collect'].includes(here)?'<button class="btn small" data-a="proj">⛶ Projector view</button>':''}
   ${!['login','denied','dash'].includes(here)?'<button class="btn small" data-a="dash">☰ Dashboard</button>':''}
   ${here==='dash'?'<button class="btn small" data-a="togame">← Back to game screen</button>':''}
   ${A.user?'<button class="btn small" data-a="signout">Sign out</button>':''}</div></div>`}
-function vLogin(){const ok=Cloud.configured(),srv=window.BACKEND==='server';return`<div class="r0-wrap">${bar()}<div class="r0-card a-narrow">
+function vLogin(){const ok=Cloud.configured(),srv=window.BACKEND==='server',mailOn=srv&&window.SrvClient&&SrvClient.mailEnabled();
+  const srvBlock=mailOn?`<p class="r0-p">Enter your email address and we will send you a sign-in link. It works once and expires quickly.</p><div style="display:flex;gap:8px;margin:6px 0"><input id="loginMail" type="email" placeholder="you@example.org" autocomplete="email" style="flex:1;padding:12px"><button class="btn gold" data-a="mailme">Email me a link</button></div><details style="margin:10px 0"><summary class="r0-tiny" style="cursor:pointer">I have a login link instead</summary><input id="loginTok" placeholder="Paste your login link" autocomplete="off" style="width:100%;padding:12px;margin:6px 0"></details>`:`<p class="r0-p">Paste the personal login link an admin sent you. It signs you in on this device for 30 days.</p><input id="loginTok" placeholder="Paste your login link" autocomplete="off" style="width:100%;padding:12px;margin:6px 0">`;return`<div class="r0-wrap">${bar()}<div class="r0-card a-narrow">
   <div style="text-align:center;margin-bottom:8px"><span class="sssio-logo xl" role="img" aria-label="SSSIO"></span></div>
   <h1>Run a "Survey Says!" game</h1>
-  ${srv?'<p class="r0-p">Paste the personal login link an admin sent you. It signs you in on this device for 30 days.</p><input id="loginTok" placeholder="Paste your login link" autocomplete="off" style="width:100%;padding:12px;margin:6px 0">':'<p class="r0-p">Sign in with an approved Google account to build surveys, collect audience answers live, and play the game from any laptop.</p>'}
+  ${srv?srvBlock:'<p class="r0-p">Sign in with an approved Google account to build surveys, collect audience answers live, and play the game from any laptop.</p>'}
   <div class="r0-btns"><button class="btn gold big" data-a="signin" ${ok?'':'disabled'}>${srv?'Sign in':'Sign in with Google'}</button><button class="btn big" data-a="practice">Try practice mode</button></div>
   ${ok?'':'<p class="r0-tiny bad">This site is not connected to Firebase yet: fill in <b>firebase-config.js</b>. Practice mode works without it.</p>'}
-  <p class="r0-tiny">Practice mode keeps everything in this browser with a simulated audience. Nothing is shared online.</p>
+  <p class="r0-tiny">Practice mode keeps everything in this browser with a simulated audience. Nothing is shared online.</p><div class="r0-tiny" style="color:#7ee0b5;margin-top:8px">${esc(A.loginNote||'')}</div>
   <div class="r0-status ${A.status?'bad':''}">${esc(A.status)}</div></div></div>`}
 function vHostOnly(){return`<div class="r0-wrap">${bar()}<div class="r0-card a-narrow"><h1>You are signed in as the game host</h1><p class="r0-p">Your view is the live emcee screen. Open <b><a href="emcee.html" style="color:var(--gold)">emcee.html</a></b> (same website) to see the board as the IT tech runs it.</p></div></div>`}
 function vDenied(){return`<div class="r0-wrap">${bar()}<div class="r0-card a-narrow"><h1>Not an approved host</h1>
@@ -879,7 +883,7 @@ function vTeam(){
   const me=(A.user&&A.user.email||'').toLowerCase(),roles=['admin','tech','host'],srv=window.BACKEND==='server';
   const desc={admin:'Everything: question bank, surveys, team, and running the game',tech:'Runs Round 0 and operates the board (no bank, no deleting surveys)',host:'Read-only emcee view'};
   const rows=A.team.map(m=>{const self=m.email===me;
-    return`<tr><td>${esc(m.email)}${self?' <span class="r0-sub">(you)</span>':''}</td><td><select data-a="teamrole" data-e="${esc(m.email)}"${self?' disabled':''}>${roles.map(r=>`<option value="${r}"${m.role===r?' selected':''}>${r}</option>`).join('')}</select></td><td>${srv?`<button class="btn" data-a="teamlink" data-e="${esc(m.email)}">🔗 Login link</button> `:''}${self?'':`<button class="btn" data-a="teamdel" data-e="${esc(m.email)}">Remove</button>`}</td></tr>`}).join('');
+    return`<tr><td>${esc(m.email)}${self?' <span class="r0-sub">(you)</span>':''}</td><td><select data-a="teamrole" data-e="${esc(m.email)}"${self?' disabled':''}>${roles.map(r=>`<option value="${r}"${m.role===r?' selected':''}>${r}</option>`).join('')}</select></td><td>${srv&&/@/.test(m.email)&&A.mailHealth&&A.mailHealth.ok?`<button class="btn" data-a="teammail" data-e="${esc(m.email)}">✉ Email link</button> `:''}${srv?`<button class="btn" data-a="teamlink" data-e="${esc(m.email)}">🔗 Copy link</button> `:''}${self?'':`<button class="btn" data-a="teamdel" data-e="${esc(m.email)}">Remove</button>`}</td></tr>`}).join('');
   return`<div class="r0-card"><h2>Team</h2><p class="r0-sub">${srv?'Only people listed here can sign in. Add a person, then send them their one-time login link (use 🔗 Login link any time to make a new one).':'Only people listed here can sign in. Use their Google account email.'}</p>
    <table class="r0-table" style="width:100%;text-align:left"><thead><tr><th>${srv?'Name or email':'Email'}</th><th>Role</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="3">No one yet.</td></tr>'}</tbody></table>
    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><input id="teamEmail" type="${srv?'text':'email'}" placeholder="${srv?'Name or email':'name@gmail.com'}" style="flex:1;min-width:220px"><select id="teamRole">${roles.map(r=>`<option value="${r}"${r==='tech'?' selected':''}>${r}</option>`).join('')}</select><button class="btn gold" data-a="teamadd">Add person</button></div>
@@ -1127,12 +1131,20 @@ function setViewAs(r){
 document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.viewas!==undefined)setViewAs(t.value)});
 /* One-time login link for a person (self-hosted mode): copy it and show it so it can be sent. */
 async function showLoginLink(id){const url=await Cloud.loginLink(id),ok=await copyText(url);prompt((ok?'Copied to your clipboard. ':'')+'Send this one-time login link to '+id+' (valid 7 days, works once):',url)}
+/* New person: email their first link if mail works, otherwise show the link so it can be sent by hand. */
+async function inviteOrShow(id){
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id)&&A.mailHealth&&A.mailHealth.ok){
+    try{await Cloud.emailInvite(id);A.status='Sign-in link emailed to '+id+'.';paint();return}
+    catch(e){alert('Could not email '+id+': '+e.message+'\n\nShowing the link instead so you can send it yourself.')}}
+  await showLoginLink(id)}
+const mailChip=()=>{const h=A.mailHealth;return h&&h.configured?`<span class="r0-chip ${h.ok?'':'warn'}" title="${esc(h.ok?('Sending as '+h.from):(h.error||''))}">Mail ${h.ok?'✓':'✗ '+esc(String(h.error||'problem').slice(0,40))}</span>`:''};
 /* Sync + AI status chips (self-hosted mode) */
 const aiChip=()=>{const h=A.aiHealth;return h?`<span class="r0-chip ${h.ok?'':'warn'}" title="${esc(h.ok?('Model '+h.model+' · '+h.ms+' ms'):(h.error||''))}">AI ${h.ok?'✓ ready':'✗ '+esc(String(h.error||'problem').slice(0,40))}</span>`:''};
 function syncChipRefresh(){const st=window.SrvClient?SrvClient.status():'offline',hd=document.getElementById('syncHdr');if(hd)hd.classList.toggle('hidden',Cloud.mode!=='server');
   document.querySelectorAll('[data-sync]').forEach(el=>{el.textContent=st==='online'?'● Live':st==='degraded'?'● Server not answering…':'● Offline — reconnecting…';el.classList.toggle('warn',st!=='online')})}
 if(window.SrvClient&&window.BACKEND==='server')SrvClient.onStatus(()=>syncChipRefresh());
 function aiHealthMaybe(){if(Cloud.mode!=='server'||!['dash','tabulate','survey'].includes(A.stage))return;if(A.aiHealthAt&&Date.now()-A.aiHealthAt<60000)return;A.aiHealthAt=Date.now();
+  if(A.realRole==='admin')Cloud.mailHealth().then(h=>{A.mailHealth=h;paint()}).catch(()=>{});
   Cloud.aiHealth().then(h=>{A.aiHealth=h;paint()}).catch(e=>{A.aiHealth={ok:false,error:e.message};paint()})}
 /* Links panel: copy-paste links for phones, hall screen and emcee */
 async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch(e){const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}ta.remove();return ok}}
@@ -1255,7 +1267,11 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b||!root()||!root().contains(b))return;const a=b.dataset.a,qn=A.tabQ;
   if(b.tagName==='INPUT'&&a!=='chk')return;
   switch(a){
-    case 'signin':A.status='';try{await Cloud.signIn(window.BACKEND==='server'?($('loginTok')||{}).value:undefined)}catch(err){A.status='Sign-in failed: '+(err.message||err);paint()}return;
+    case 'mailme':{const em=(($('loginMail')||{}).value||'').trim();A.status='';A.loginNote='';
+      if(!em){A.status='Enter your email address.';paint();return}
+      try{await Cloud.requestLink(em);A.loginNote='If that address is approved, a sign-in link is on its way. Check your inbox (and junk folder). It works once.'}catch(err){A.status=err.message||String(err)}
+      paint();return}
+    case 'signin':A.status='';A.loginNote='';try{await Cloud.signIn(window.BACKEND==='server'?($('loginTok')||{}).value:undefined)}catch(err){A.status='Sign-in failed: '+(err.message||err);paint()}return;
     case 'practice':await Cloud.start('memory');Cloud.onAuth(onUser);return;
     case 'signout':try{await Cloud.signOut()}catch(err){}A.user=null;A.stage='login';A.sv=null;paint();return;
     case 'dash':return guard(goDash,'Could not load');
@@ -1313,7 +1329,8 @@ document.addEventListener('click',async e=>{
     case 'teamadd':return guard(async()=>{const em=($('teamEmail').value||'').trim().toLowerCase(),role=$('teamRole').value;
       if(window.BACKEND==='server'?em.length<2:!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){alert(window.BACKEND==='server'?'Enter a name or email.':'Enter a valid email address.');return}
       if(em===(A.user.email||'').toLowerCase()){alert('That is you.');return}
-      await Cloud.saveTeam(em,role);A.team=await Cloud.listTeam();A.status=em+' added as '+role+'.';paint();if(window.BACKEND==='server')await showLoginLink(em)},'Could not add');
+      await Cloud.saveTeam(em,role);A.team=await Cloud.listTeam();A.status=em+' added as '+role+'.';paint();if(window.BACKEND==='server')await inviteOrShow(em)},'Could not add');
+    case 'teammail':return guard(async()=>{await Cloud.emailInvite(b.dataset.e);A.status='Sign-in link emailed to '+b.dataset.e+'.';paint()},'Could not email the link');
     case 'teamlink':return guard(()=>showLoginLink(b.dataset.e),'Could not create the link');
     case 'teamdel':return guard(async()=>{const em=b.dataset.e;if(!confirm('Remove '+em+'? They will no longer be able to sign in.'))return;
       await Cloud.deleteTeam(em);A.team=await Cloud.listTeam();A.status=em+' removed.';paint()},'Could not remove');

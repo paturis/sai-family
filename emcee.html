@@ -321,7 +321,7 @@ function topBar(){return '<div class="top"><div style="display:flex;align-items:
   (state.sv?'<button data-a="back">Games</button> ':'')+(state.user?'<button data-a="out">Sign out</button>':'')+'</div></div>'}
 function draw(){
   var h=topBar();
-  if(state.stage==='login')h+='<div class="card"><h1>Game host sign-in</h1>'+(window.BACKEND==='server'?'<p class="small">Paste the personal login link an admin sent you. This screen shows the hidden answers, so it is not public.</p><input id="loginTok" placeholder="Paste your login link" style="width:100%;padding:12px;border-radius:10px;border:1px solid #456483;background:#03213d;color:#fff;margin:8px 0" autocomplete="off"><button class="gold" data-a="in">Sign in</button>':'<p class="small">Sign in with the Google account an admin approved for you. This screen shows the hidden answers, so it is not public.</p><button class="gold" data-a="in">Sign in with Google</button>')+'<div class="small" style="color:var(--coral);margin-top:10px">'+esc(state.msg)+'</div></div>';
+  if(state.stage==='login')h+='<div class="card"><h1>Game host sign-in</h1>'+(window.BACKEND==='server'?serverLogin():'<p class="small">Sign in with the Google account an admin approved for you. This screen shows the hidden answers, so it is not public.</p><button class="gold" data-a="in">Sign in with Google</button>')+'<div class="small" style="color:var(--coral);margin-top:10px">'+esc(state.msg)+'</div><div class="small" style="color:#7ee0b5;margin-top:8px">'+esc(state.note||'')+'</div></div>';
   else if(state.stage==='denied')h+='<div class="card"><h1>Not approved</h1><p class="small">'+esc(state.user&&state.user.email)+' has not been approved as a host. Ask an admin to add you.</p></div>';
   else if(state.stage==='list'){
     h+='<div class="card"><h1>Choose the game</h1><p class="small">Games whose board is ready appear here. You will follow the board live as the IT tech runs it.</p><div class="list">'+
@@ -352,7 +352,8 @@ function game(){
 
 app.addEventListener('click',function(e){
   var b=e.target.closest('[data-a]');if(!b)return;var a=b.dataset.a;
-  if(a==='in')B.signIn((document.getElementById('loginTok')||{}).value).catch(function(err){state.msg='Sign-in failed: '+(err.message||err);draw()});
+  if(a==='mail'){var em=((document.getElementById('loginMail')||{}).value||'').trim();state.msg='';state.note='';if(!em){state.msg='Enter your email address.';draw();return}B.requestLink(em).then(function(){state.note='If that address is approved, a sign-in link is on its way. Check your inbox (and junk folder). It works once.';draw()},function(err){state.msg=String(err.message||err);draw()})}
+  else if(a==='in')B.signIn((document.getElementById('loginTok')||{}).value).catch(function(err){state.msg='Sign-in failed: '+(err.message||err);draw()});
   else if(a==='out'){if(state.unsub)state.unsub();B.signOut().then(function(){state.user=null;state.stage='login';state.sv=null;draw()})}
   else if(a==='refresh')loadList();
   else if(a==='back'){if(state.unsub)state.unsub();state.sv=null;state.S=null;state.stage='list';loadList()}
@@ -376,9 +377,14 @@ async function firebaseBackend(){
     listReady:function(){return F.getDocs(F.query(F.collection(db,'surveys'),F.where('status','==','ready'))).then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data())})})},
     watchGame:function(id,cb){return F.onSnapshot(F.doc(db,'surveys',id,'data','game'),function(s){cb(s.exists()?JSON.parse(s.data().json):null)},function(){cb(null)})}
   }}
+function serverLogin(){
+  var inp='style="width:100%;padding:12px;border-radius:10px;border:1px solid #456483;background:#03213d;color:#fff;margin:8px 0"';
+  if(window.SrvClient&&window.SrvClient.mailEnabled())return '<p class="small">Enter your email address and we will send you a sign-in link. This screen shows the hidden answers, so it is not public.</p><input id="loginMail" type="email" placeholder="you@example.org" autocomplete="email" '+inp+'><button class="gold" data-a="mail">Email me a link</button><details style="margin-top:12px"><summary class="small" style="cursor:pointer">I have a login link instead</summary><input id="loginTok" placeholder="Paste your login link" autocomplete="off" '+inp+'><button class="gold" data-a="in">Sign in</button></details>';
+  return '<p class="small">Paste the personal login link an admin sent you. This screen shows the hidden answers, so it is not public.</p><input id="loginTok" placeholder="Paste your login link" autocomplete="off" '+inp+'><button class="gold" data-a="in">Sign in</button>'}
 function serverBackend(){
   var C=window.SrvClient;
   return{
+    requestLink:function(e){return C.requestLink(e)},
     signIn:function(v){return C.signIn(v)},
     signOut:function(){return C.signOut()},
     onAuth:function(cb){C.authInit(function(u){if(!u&&C.authError())state.msg=C.authError();cb(u)})},

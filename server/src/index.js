@@ -12,6 +12,7 @@ import { createStore, HttpError, okCode } from './store.js';
 import { createAuth, createLimiter, cookieHeader, SESSION_TTL } from './auth.js';
 import { createAI } from './ai.js';
 import { createRpc } from './rpc.js';
+import { createMailer } from './mail.js';
 
 /** Path of a request, safe for odd inputs like "//" (which new URL(req.url, base) would treat as a host). */
 const pathOf = (req) => new URL('http://x' + (String(req.url).startsWith('/') ? req.url : '/' + req.url)).pathname;
@@ -51,7 +52,8 @@ export async function createApp(overrides = {}) {
   const store = createStore({ db, hub, closeGraceMs: config.closeGraceMs, answerGraceMs: config.answerGraceMs });
   const auth = createAuth({ db, config, secret });
   const ai = createAI({ config, store, db, fetchImpl: overrides.fetchImpl });
-  const rpc = createRpc({ store, auth, ai });
+  const mailer = createMailer({ config, transportFactory: overrides.mailTransport });
+  const rpc = createRpc({ store, auth, ai, mailer, config });
   const limiter = createLimiter();
   const publicHost = new URL(config.publicUrl).host;
 
@@ -109,7 +111,23 @@ export async function createApp(overrides = {}) {
         return json(res, 200, { r: r === undefined ? null : r });
       }
       case '/api/auth/me':
-        return json(res, 200, { user: auth.sessionUser(req) });
+        return json(res, 200, { user: auth.sessionUser(req), mailEnabled: mailer.enabled });
+      case '/api/auth/request-link': {
+        // Always answers the same way, so it cannot be used to find out who has an account.
+        if (!mailer.enabled) throw new HttpError(503, 'mail_not_configured', 'Email sign-in is not set up. Use the login link an admin gave you.');
+        const email = String(body.email || '').trim().toLowerCase();
+        if (!limiter(`mailip:${clientIp(req)}`, 30, 15 * 60_000)) throw new HttpError(429, 'rate_limited', 'Too many requests, try again in a few minutes');
+        const same = () => json(res, 200, { ok: true });
+        if (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return same();
+        if (!limiter(`mail:${email}`, 3, 15 * 60_000)) return same();
+        const u = store.users.get(email);
+        if (u && !u.disabled) {
+          const { url } = auth.createLoginLink(email, config.emailLinkTtlMs);
+          mailer.sendLoginLink({ to: email, url, minutes: Math.round(config.emailLinkTtlMs / 60_000) })
+            .catch((e) => console.error(`[mail] could not send sign-in email: ${e.message}`));
+        }
+        return same();
+      }
       case '/api/auth/redeem': {
         if (!limiter(`redeem:${clientIp(req)}`, 20, 60_000)) throw new HttpError(429, 'rate_limited', 'Too many attempts, wait a minute');
         const { sid, user } = auth.redeem(body.token);
@@ -237,7 +255,7 @@ export async function createApp(overrides = {}) {
   const reset = setInterval(() => { for (const ws of wss.clients) ws.msgs = 0; }, 10_000);
 
   return {
-    config, db, store, auth, ai, hub, server, wss, rpc,
+    config, db, store, auth, ai, mailer, hub, server, wss, rpc,
     listen: () => new Promise((resolve) => server.listen(config.port, config.host, () => resolve(server.address().port))),
     close: async () => {
       clearInterval(beat); clearInterval(reset);
@@ -255,6 +273,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = await app.listen();
   const key = app.config.geminiKey ? `AI: ${app.config.geminiModel}` : 'AI: GEMINI_API_KEY not set';
   console.log(`[server] listening on :${port}  public ${app.config.publicUrl}  web ${app.config.webRoot}  ${key}`);
+  if (app.mailer.enabled) {
+    app.mailer.health(true).then((h) => console.log(`[mail] SMTP ${h.host}: ${h.ok ? `ready (from ${h.from})` : `FAILED — ${h.error}`}`));
+  } else console.log('[mail] SMTP not configured: sign-in by emailed link is off (login links from the CLI still work)');
   if (app.config.geminiKey) {
     app.ai.health(true).then((h) => console.log(`[ai] self-test: ${h.ok ? `ready (${h.model}, ${h.ms} ms)` : `FAILED — ${h.error}`}`));
   }
