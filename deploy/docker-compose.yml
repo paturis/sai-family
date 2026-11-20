@@ -1,0 +1,42 @@
+# Sai game show — self-hosted. Sits behind the Caddy you already run.
+#   cp .env.example .env   (edit it)   then:   docker compose up -d --build
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: sai-gameshow:latest
+    container_name: sai-gameshow
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - gameshow-data:/data          # the database, backups and the session secret
+    # --- keep it small and contained on a shared server ---
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 200
+    ulimits:
+      nofile: { soft: 65535, hard: 65535 }   # one descriptor per phone: plenty of headroom
+    networks:
+      caddy:
+        aliases: [sai-gameshow]       # Caddy reaches us at sai-gameshow:8080
+    # If your Caddy runs directly on the host (not in Docker), remove the networks block above and use:
+    # ports: ["127.0.0.1:8080:8080"]   # then in Caddy:  reverse_proxy 127.0.0.1:8080
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  gameshow-data:
+
+networks:
+  caddy:
+    external: true
+    name: ${CADDY_NETWORK:-caddy}     # the Docker network your Caddy container is on

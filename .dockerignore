@@ -1,0 +1,12 @@
+.git
+.gitignore
+.DS_Store
+node_modules
+server/node_modules
+server/data
+server/test
+server/loadtest
+deploy
+*.md
+firestore.rules
+.env

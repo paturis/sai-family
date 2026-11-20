@@ -1,0 +1,20 @@
+{
+  "name": "sai-gameshow-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted backend for the SSSIO game show: SQLite + WebSocket realtime + server-side AI grouping.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-force-exit \"test/*.test.js\"",
+    "cli": "node --disable-warning=ExperimentalWarning src/cli.js",
+    "loadtest": "node loadtest/phones.js",
+    "e2e": "node --disable-warning=ExperimentalWarning test/e2e/browser.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

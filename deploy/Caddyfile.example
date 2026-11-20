@@ -1,0 +1,6 @@
+# Add this site block to the Caddyfile you already run, then reload Caddy.
+# WebSockets work automatically with reverse_proxy.
+game.example.org {
+	encode zstd gzip
+	reverse_proxy sai-gameshow:8080
+}

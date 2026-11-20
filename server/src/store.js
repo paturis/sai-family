@@ -1,0 +1,217 @@
+import crypto from 'node:crypto';
+
+export class HttpError extends Error {
+  constructor(status, code, message) {
+    super(message || code);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export const newId = () => crypto.randomBytes(9).toString('base64url');
+const J = (v) => JSON.stringify(v);
+const P = (s) => (s == null ? null : JSON.parse(s));
+const plain = (row) => (row ? { ...row } : null);
+
+const CODE_RE = /^[A-Z0-9]{3,12}$/;
+export const okCode = (c) => typeof c === 'string' && CODE_RE.test(c);
+
+/**
+ * All data access. Everything the old Firestore security rules enforced lives here:
+ *  - phones can answer only while the question is open, only for the current question,
+ *    one answer per phone per question, 1-80 characters;
+ *  - buzz order uses the SERVER clock, first buzz wins (a phone cannot forge a time);
+ *  - questions close by themselves on the server when the countdown ends.
+ */
+export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500, now = () => Date.now() }) {
+  const cache = new Map();
+  const S = (sql) => {
+    let s = cache.get(sql);
+    if (!s) cache.set(sql, (s = db.prepare(sql)));
+    return s;
+  };
+  const tx = (fn) => {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const r = fn();
+      db.exec('COMMIT');
+      return r;
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch { /* already rolled back */ }
+      throw e;
+    }
+  };
+  const pub = (ch, data) => hub && hub.publish(ch, data);
+  const timers = new Map();
+  let seq = 0;
+
+  /* ---------- users ---------- */
+  const users = {
+    list: () => S('SELECT id,name,role,disabled,created_at FROM users ORDER BY id').all().map(plain),
+    get: (id) => plain(S('SELECT id,name,role,disabled,created_at FROM users WHERE id=?').get(id)),
+    upsert: (id, role, name) => {
+      S(`INSERT INTO users(id,name,role,created_at) VALUES(?,?,?,?)
+         ON CONFLICT(id) DO UPDATE SET role=excluded.role, disabled=0`).run(id, name || id, role, now());
+    },
+    remove: (id) => tx(() => {
+      S('DELETE FROM sessions WHERE user_id=?').run(id);
+      S('DELETE FROM login_tokens WHERE user_id=?').run(id);
+      S('DELETE FROM users WHERE id=?').run(id);
+    }),
+  };
+
+  /* ---------- question bank ---------- */
+  const questions = {
+    list: () => S('SELECT id,json FROM questions').all().map((r) => ({ ...P(r.json), id: r.id })),
+    save: (doc) => {
+      const q = { ...doc };
+      let id = q.id;
+      delete q.id;
+      q.updatedAt = now();
+      if (!id) {
+        id = newId();
+        q.createdAt = q.createdAt || now();
+      }
+      S(`INSERT INTO questions(id,json,created_at) VALUES(?,?,?)
+         ON CONFLICT(id) DO UPDATE SET json=excluded.json`).run(id, J(q), q.createdAt || now());
+      return id;
+    },
+    remove: (id) => { S('DELETE FROM questions WHERE id=?').run(id); },
+    seed: (arr) => tx(() => {
+      for (const q0 of arr) {
+        const q = { ...q0, createdAt: now(), updatedAt: now() };
+        delete q.id;
+        S('INSERT INTO questions(id,json,created_at) VALUES(?,?,?)').run(newId(), J(q), q.createdAt);
+      }
+    }),
+  };
+
+  /* ---------- live (what phones see) ---------- */
+  const schedule = (code) => {
+    clearTimeout(timers.get(code));
+    timers.delete(code);
+    const d = live.get(code);
+    // Buzzer windows are closed by the tech console (it decides the winner), everything else closes itself.
+    if (!d || d.phase !== 'open' || !(d.closesAt > 0) || d.mode === 'buzzer') return;
+    const ms = Math.min(2 ** 31 - 1, Math.max(0, d.closesAt + closeGraceMs - now()));
+    const t = setTimeout(() => {
+      timers.delete(code);
+      const c = live.get(code);
+      if (c && c.phase === 'open' && c.q === d.q && c.closesAt <= now()) live.update(code, { phase: 'closed', hostNow: now() });
+    }, ms);
+    t.unref?.();
+    timers.set(code, t);
+  };
+
+  const live = {
+    get: (code) => P((S('SELECT json FROM live WHERE code=?').get(code) || {}).json),
+    free: (code) => !S('SELECT 1 AS x FROM live WHERE code=?').get(code),
+    set: (code, o) => {
+      S(`INSERT INTO live(code,json,updated_at) VALUES(?,?,?)
+         ON CONFLICT(code) DO UPDATE SET json=excluded.json, updated_at=excluded.updated_at`).run(code, J(o), now());
+      pub('live:' + code, o);
+      schedule(code);
+    },
+    update: (code, patch) => {
+      const cur = live.get(code);
+      if (!cur) throw new HttpError(404, 'not_found', 'Unknown code');
+      live.set(code, { ...cur, ...patch });
+    },
+    remove: (code) => {
+      clearTimeout(timers.get(code));
+      timers.delete(code);
+      tx(() => {
+        S('DELETE FROM answers WHERE code=?').run(code);
+        S('DELETE FROM display WHERE code=?').run(code);
+        S('DELETE FROM live WHERE code=?').run(code);
+      });
+      pub('live:' + code, null);
+      pub('display:' + code, null);
+    },
+  };
+
+  /* ---------- display (projector) ---------- */
+  const display = {
+    get: (code) => P((S('SELECT json FROM display WHERE code=?').get(code) || {}).json),
+    set: (code, o) => {
+      S(`INSERT INTO display(code,json,updated_at) VALUES(?,?,?)
+         ON CONFLICT(code) DO UPDATE SET json=excluded.json, updated_at=excluded.updated_at`).run(code, J(o), now());
+      pub('display:' + code, o);
+    },
+  };
+
+  /* ---------- surveys and their data blobs ---------- */
+  const surveys = {
+    list: () => S('SELECT id,json FROM surveys').all().map((r) => ({ ...P(r.json), id: r.id })),
+    get: (id) => {
+      const r = S('SELECT id,json FROM surveys WHERE id=?').get(id);
+      return r ? { ...P(r.json), id: r.id } : null;
+    },
+    create: (o) => {
+      const id = newId();
+      const d = { ...o, createdAt: now() };
+      delete d.id;
+      S('INSERT INTO surveys(id,json,created_at) VALUES(?,?,?)').run(id, J(d), d.createdAt);
+      return id;
+    },
+    update: (id, patch) => {
+      const r = S('SELECT json FROM surveys WHERE id=?').get(id);
+      if (!r) throw new HttpError(404, 'not_found', 'Unknown survey');
+      const d = { ...P(r.json), ...patch };
+      delete d.id;
+      S('UPDATE surveys SET json=? WHERE id=?').run(J(d), id);
+    },
+    remove: (id) => {
+      const s = surveys.get(id);
+      tx(() => {
+        S('DELETE FROM survey_data WHERE survey_id=?').run(id);
+        S('DELETE FROM surveys WHERE id=?').run(id);
+      });
+      if (s && s.code && okCode(s.code)) live.remove(s.code);
+    },
+  };
+
+  const data = {
+    get: (id, name) => P((S('SELECT json FROM survey_data WHERE survey_id=? AND name=?').get(id, name) || {}).json),
+    set: (id, name, o) => {
+      S(`INSERT INTO survey_data(survey_id,name,json,updated_at) VALUES(?,?,?,?)
+         ON CONFLICT(survey_id,name) DO UPDATE SET json=excluded.json, updated_at=excluded.updated_at`).run(id, name, J(o), now());
+      if (name === 'game') pub('game:' + id, o);
+    },
+  };
+
+  /* ---------- answers and buzzes ---------- */
+  const answers = {
+    submit: ({ code, uid, q, a, buzz = false }) => {
+      const d = live.get(code);
+      if (!d) throw new HttpError(404, 'not_found', 'That code was not found');
+      const closed = () => new HttpError(409, 'closed', 'This question is closed');
+      if (d.phase !== 'open' || !Number.isInteger(q) || q !== d.q) throw closed();
+      if (d.closesAt > 0 && now() > d.closesAt + answerGraceMs) throw closed();
+      if (Boolean(buzz) !== (d.mode === 'buzzer')) throw closed();
+      const text = String(a == null ? '' : a).replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+      if (!text || text.length > 80) throw new HttpError(400, 'bad_answer', 'Answer must be 1 to 80 characters');
+      const t = now() * 1000 + (seq++ % 1000);
+      if (buzz) {
+        S('INSERT OR IGNORE INTO answers(code,uid,q,a,t) VALUES(?,?,?,?,?)').run(code, uid, q, text, t);
+      } else {
+        S(`INSERT INTO answers(code,uid,q,a,t) VALUES(?,?,?,?,?)
+           ON CONFLICT(code,uid,q) DO UPDATE SET a=excluded.a, t=excluded.t`).run(code, uid, q, text, t);
+      }
+    },
+    count: (code, q) => S('SELECT count(*) AS n FROM answers WHERE code=? AND q=?').get(code, q).n,
+    buzzes: (code, q) => S('SELECT uid,a,t FROM answers WHERE code=? AND q=? ORDER BY t').all(code, q).map(plain),
+    all: (code) => {
+      const out = {};
+      for (const r of S('SELECT q,a FROM answers WHERE code=? ORDER BY q,t').all(code)) (out[r.q] = out[r.q] || []).push(r.a);
+      return out;
+    },
+  };
+
+  return {
+    users, questions, surveys, data, live, display, answers, tx,
+    /** After a restart: close questions whose time ran out, re-arm the rest. */
+    rescheduleAll: () => { for (const r of S('SELECT code FROM live').all()) schedule(r.code); },
+    close: () => { for (const t of timers.values()) clearTimeout(t); timers.clear(); },
+  };
+}

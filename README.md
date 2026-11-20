@@ -53,3 +53,9 @@ you are close, or check the live usage in the Firebase console. Verify current q
 - Two techs should not operate the same game at once (last save wins).
 - The phone countdown can be off by a second or two; the host's timer decides when a question closes.
 - English only for now. The game header still says "Sai Five" in a few places when a game uses a different shape.
+
+## Self-hosted option (Docker + SQLite + WebSocket)
+This branch also contains a self-hosted backend in `server/` that replaces Firebase: no quotas, no per-IP sign-in limits,
+server-side AI grouping with the Gemini key kept on the server, and personal login links instead of Google sign-in.
+See [`deploy/README.md`](deploy/README.md). The pages choose their backend from `backend-config.js`
+(`firebase` on GitHub Pages, `server` when served by the container), so the original setup keeps working.
