@@ -93,6 +93,7 @@ body.r0-open{overflow:hidden}
       <button class="btn small" id="editBtn">Edit survey</button>
       <button class="btn small" id="r0Btn">Host console</button>
       <button class="btn small" id="dispBtn">📺 Audience display</button>
+      <button class="btn small gold" id="linksBtn">🔗 Links</button>
       <button class="btn small gold" id="presentBtn">⛶ Presentation mode</button>
     </div>
   </header>
@@ -794,7 +795,7 @@ const orderQs=a=>[...a.filter(q=>q.kind!=='fast'),...a.filter(q=>q.kind==='fast'
 function bar(extra){
   const here=A.stage;
   return`<div class="r0-top"><div class="r0-brand"><span class="sssio-logo" role="img" aria-label="SSSIO"></span><div><div class="r0-kicker">SSSIO · GAME SHOW CONSOLE</div><div class="r0-sub">${A.sv&&['lobby','collect','tabulate','gate'].includes(here)?'Survey: '+esc(A.sv.name)+' · Contestants wait outside the hall during Round 0':'Create surveys, run the audience round and play the game'}</div></div></div>
-  <div class="r0-top-actions">${Cloud.mode==='memory'?'<span class="r0-chip warn">PRACTICE MODE · this browser only</span>':''}${A.user&&Cloud.mode==='firebase'?'<span class="r0-chip">'+esc(A.user.email)+' · '+esc(A.role)+'</span>':''}${extra||''}
+  <div class="r0-top-actions">${Cloud.mode==='memory'?'<span class="r0-chip warn">PRACTICE MODE · this browser only</span>':''}${A.user&&Cloud.mode==='firebase'?'<span class="r0-chip">'+esc(A.user.email)+' · '+esc(A.role)+'</span>':''}${A.sv&&A.sv.code?'<button class="btn small gold" data-a="links">🔗 Links</button>':''}${extra||''}
   ${['lobby','collect'].includes(here)?'<button class="btn small" data-a="proj">⛶ Projector view</button>':''}
   ${!['login','denied','dash'].includes(here)?'<button class="btn small" data-a="dash">☰ Dashboard</button>':''}
   ${here==='dash'?'<button class="btn small" data-a="togame">← Back to game screen</button>':''}
@@ -1062,6 +1063,25 @@ async function resumeGameStage(sv){
     else{setGame(deepCopy(sv.board),false);const g=await Cloud.getData(sv.id,'game').catch(()=>null);if(g&&g.S)S=Object.assign(fresh(),g.S,{presentation:false,timerRunning:false,lang:'en'})}
     S.confirmedSurvey=true;A.stage='off';persistA();render();paint();toast('Game resumed — scores and reveals restored');return true
   }catch(e){console.error(e);return false}}
+/* Links panel: copy-paste links for phones, hall screen and emcee */
+async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch(e){const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}ta.remove();return ok}}
+function showLinks(){
+  const sv=A.sv;if(!sv||!sv.code){toast('Open a survey first — links appear once it has a code.');return}
+  const emcee=new URL('emcee.html',location.href);emcee.search='';emcee.hash='';
+  const L=[['Audience phones (the QR link)',playUrl(sv.code),'Everyone joins here. Code: '+sv.code+(location.protocol==='file:'?' — WARNING: this page was opened from a file, so phones cannot use this link.':'')],
+    ['Hall screen / projector',displayUrl(),'Open on the projector laptop. No sign-in needed.'],
+    ['Emcee',emcee.toString(),'Sign in with Google, then pick “'+(sv.name||'the game')+'”. The emcee must be added as host in the Team tab. The game appears in their list once the board is loaded.']];
+  const all=(sv.name||'Game')+'\nJoin on your phone: '+L[0][1]+'\nHall screen: '+L[1][1]+'\nEmcee: '+L[2][1];
+  const old=document.getElementById('linksOv');if(old)old.remove();
+  const d=document.createElement('div');d.id='linksOv';d.style.cssText='position:fixed;inset:0;z-index:95;background:rgba(0,10,25,.82);display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow:auto';
+  d.innerHTML=`<div style="width:min(720px,100%);background:#0b2f57;border:1px solid #42688a;border-radius:16px;padding:20px;color:#fff;box-shadow:0 20px 70px #000a"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 style="margin:0;font-size:20px">Links to share</h2><button class="btn" data-lclose="1">✕ Close</button></div>`+
+    L.map((x,i)=>`<div style="margin:14px 0"><div style="font-weight:800;font-size:13px;color:#ffc87a">${esc(x[0])}</div><div style="display:flex;gap:8px;margin-top:5px"><input readonly value="${esc(x[1])}" style="flex:1;min-width:0;padding:10px;border-radius:9px;border:1px solid #456483;background:#03213d;color:#fff;font:inherit;font-size:13px" onfocus="this.select()"><button class="btn" data-lcopy="${i}">Copy</button></div><div style="font-size:12px;color:#b9cfe5;margin-top:4px">${esc(x[2])}</div></div>`).join('')+
+    `<button class="btn gold" data-lcopy="all" style="width:100%;margin-top:6px">Copy all three as a message</button></div>`;
+  d.addEventListener('click',async e=>{const b=e.target.closest('button');
+    if(e.target===d||(b&&b.dataset.lclose)){d.remove();return}
+    if(b&&b.dataset.lcopy!==undefined){const k=b.dataset.lcopy,ok=await copyText(k==='all'?all:L[+k][1]),t=b.textContent;b.textContent=ok?'Copied ✓':'Press Ctrl+C';setTimeout(()=>{b.textContent=t},1600)}});
+  document.body.appendChild(d)}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=document.getElementById('linksOv');if(o)o.remove()}});
 /* Back button / tab close guard for the tech console */
 (function(){
   const active=()=>['lobby','collect','tabulate','gate','off','gplay'].includes(A.stage);
@@ -1250,6 +1270,7 @@ document.addEventListener('click',async e=>{
       A.groups[qn]=gs.filter(g=>g===t||!ids.includes(g.id));SEL={};saveGroupsSoon();return paint()}
     case 'split':{const gs=A.groups[qn],g=gs.find(x=>x.id===Number(b.dataset.id)),k=b.dataset.k;if(!g||!(k in g.v))return;const n=g.v[k];delete g.v[k];gs.push({id:nextId++,label:cap(k),es:'',v:{[k]:n}});saveGroupsSoon();return paint()}
     case 'add':{const label=prompt('Answer:');if(!label)return;const n=Math.max(1,Number(prompt('How many respondents gave this answer?','5'))||1);A.groups[qn]=A.groups[qn]||[];A.groups[qn].push({id:nextId++,label:cap(label),es:'',v:{[label]:n}});saveGroupsSoon();return paint()}
+    case 'links':showLinks();return;
     case 'aiq':aiGroupRun([qn]);return;
     case 'aiall':aiGroupRun(items().map((_,i)=>i));return;
     case 'aikey':aiSetup();return;
@@ -1279,6 +1300,7 @@ document.addEventListener('change',e=>{const t=e.target;if(!root()||!root().cont
 document.addEventListener('keydown',e=>{const r=root();if(!r||r.classList.contains('hidden'))return;
   if(e.key==='Escape'&&proj){proj=false;paint()}
   if(!e.target.matches('input,textarea,select'))e.stopPropagation()},true);
+const lbtn=$('linksBtn');if(lbtn)lbtn.onclick=showLinks;
 const dbtn=$('dispBtn');if(dbtn)dbtn.onclick=()=>{if(!A.sv||!A.sv.code){toast('Open a survey with a ready board first.');return}window.open(displayUrl(),'_blank')};
 const btn=$('r0Btn');if(btn)btn.onclick=()=>{A.stage=A.user?'dash':'login';if(A.user)guard(goDash,'Could not load');else paint()};
 
