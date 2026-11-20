@@ -134,7 +134,8 @@ async function firebaseBackend(){
   var cfg=window.FIREBASE_CONFIG;
   if(!cfg||!cfg.apiKey||/PASTE|YOUR/i.test(cfg.apiKey))throw new Error('This site is not configured yet (firebase-config.js).');
   var A=await import(FB_BASE+'firebase-app.js'),F=await import(FB_BASE+'firebase-firestore.js'),Au=await import(FB_BASE+'firebase-auth.js');
-  var app=A.initializeApp(cfg),db=F.getFirestore(app),auth=Au.getAuth(app);
+  /* Named app = separate saved login, so testing the phone page never signs the tech's Google session out. */
+  var app=A.initializeApp(cfg,'audience'),db=F.getFirestore(app),auth=Au.getAuth(app);
   var cred=await Au.signInAnonymously(auth),uid=cred.user.uid;
   return{
     subscribe:function(c,cb){return F.onSnapshot(F.doc(db,'live',c),function(s){cb(s.exists()?s.data():null)},function(){cb(null)})},

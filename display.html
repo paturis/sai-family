@@ -361,7 +361,8 @@ function onDoc(d){
 async function firebaseBackend(){
   var cfg=window.FIREBASE_CONFIG;if(!cfg||!cfg.apiKey||/PASTE|YOUR/i.test(cfg.apiKey))throw new Error('This site is not configured yet (firebase-config.js).');
   var A=await import(FB+'firebase-app.js'),F=await import(FB+'firebase-firestore.js'),Au=await import(FB+'firebase-auth.js');
-  var a=A.initializeApp(cfg),db=F.getFirestore(a),auth=Au.getAuth(a);await Au.signInAnonymously(auth);
+  /* Named app = separate saved login. The default app's login belongs to the tech's Google session; signing in anonymously on it would sign the tech out of every tab. */
+  var a=A.initializeApp(cfg,'audience'),db=F.getFirestore(a),auth=Au.getAuth(a);await Au.signInAnonymously(auth);
   return{subscribe:function(c,cb){return F.onSnapshot(F.doc(db,'display',c),function(s){cb(s.exists()?s.data():null)},function(){cb(null)})}}}
 (async function(){
   if(!code){askCode();return}
