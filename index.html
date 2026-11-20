@@ -721,7 +721,7 @@ function regroupAll(){A.groups={};Object.keys(A.raw||{}).forEach(q=>{A.groups[q]
   nextId=1+Math.max(0,...Object.values(A.groups).flat().map(g=>g.id))}
 /* ---------- AI grouping (Gemini). The key lives only in this browser's localStorage.
    Any failure (no key, offline, bad JSON) leaves the existing heuristic groups untouched. ---------- */
-const AI_DEFAULT_MODEL='gemini-2.5-flash-lite';
+const AI_DEFAULT_MODEL='gemini-3.5-flash-lite';
 function aiCfg(){try{return JSON.parse(localStorage.getItem('sfeud_ai')||'null')||{}}catch(e){return {}}}
 function aiSetup(){const c=aiCfg(),k=prompt('Paste your Gemini API key (stored only in this browser; leave blank to clear):',c.key||'');if(k===null)return false;
   let cfg={};if(k.trim()){const m=prompt('Model name (use the cheapest Flash-Lite model shown in Google AI Studio):',c.model||AI_DEFAULT_MODEL);if(m===null)return false;cfg={key:k.trim(),model:(m||AI_DEFAULT_MODEL).trim()}}
