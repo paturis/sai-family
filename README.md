@@ -59,3 +59,10 @@ This branch also contains a self-hosted backend in `server/` that replaces Fireb
 server-side AI grouping with the Gemini key kept on the server, and personal login links instead of Google sign-in.
 See [`deploy/README.md`](deploy/README.md). The pages choose their backend from `backend-config.js`
 (`firebase` on GitHub Pages, `server` when served by the container), so the original setup keeps working.
+
+## Look and feel
+The design follows sathyasai.org: white and airy staff screens, dark navy panels for what the hall sees, orange and blue brand
+colours, Open Sans text and Rokkitt slab headings (both self-hosted in `fonts/`, so no internet is needed).
+`theme.css` holds the shared colours, buttons, chips and form controls; `console.css` styles the tech/admin console and the
+operator screen; the phone, projector and emcee pages carry their own small page styles. To review every screen after a change:
+`cd server && npm run shots -- /some/folder` (needs Chrome) walks through the whole app and saves a screenshot of each screen.

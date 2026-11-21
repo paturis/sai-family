@@ -135,6 +135,10 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
   fs.writeFileSync(path.join(dir, 'firestore.rules'), 'secret');
   fs.writeFileSync(path.join(dir, '.env'), 'GEMINI_API_KEY=secret');
   fs.writeFileSync(path.join(dir, 'backend-config.js'), 'window.BACKEND="firebase"');
+  fs.writeFileSync(path.join(dir, 'theme.css'), 'body{}');
+  fs.mkdirSync(path.join(dir, 'fonts'));
+  fs.writeFileSync(path.join(dir, 'fonts', 'x.woff2'), 'FONT');
+  fs.writeFileSync(path.join(dir, 'fonts', 'notes.txt'), 'no');
   const s = await startApp({ webRoot: dir });
   try {
     const get = async (p) => fetch(s.base + p);
@@ -154,6 +158,18 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
 
     const h = await (await get('/healthz')).json();
     assert.equal(h.ok, true);
+
+    const css = await get('/theme.css');
+    assert.equal(css.status, 200);
+    assert.match(css.headers.get('content-type'), /text\/css/);
+    const font = await get('/fonts/x.woff2');
+    assert.equal(font.status, 200);
+    assert.equal(font.headers.get('content-type'), 'font/woff2');
+    assert.match(font.headers.get('cache-control'), /max-age/);
+    assert.equal((await get('/fonts/notes.txt')).status, 404, 'only fonts are served from the fonts folder');
+    assert.equal((await get('/fonts/../index.html')).status, 200, 'normalised by the client to /index.html');
+    assert.equal((await get('/fonts/%2e%2e/secret.html')).status, 404);
+    assert.equal((await get('/fonts/..%2fplay.html')).status, 404);
 
     // odd paths must not crash the server
     assert.equal((await get('//')).status, 200, 'double slash is just the home page');

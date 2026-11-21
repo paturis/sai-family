@@ -27,7 +27,7 @@
     if (!r.ok) {
       var err = new Error((j && j.error) || ('HTTP ' + r.status));
       err.status = r.status; err.code = (j && j.code) || ('http_' + r.status);
-      if (r.status === 401 && authCb && path === '/api/rpc') { meUser = null; authError = 'Your session ended. Please sign in again.'; authCb(null); }
+      if (r.status === 401 && authCb && meUser && path === '/api/rpc') { meUser = null; authError = 'Your session ended. Please sign in again.'; authCb(null); }
       throw err;
     }
     return j || {};

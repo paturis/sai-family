@@ -24,9 +24,10 @@ const MIME = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
 };
 // Only these file names are served from the web folder (no dotfiles, no rules/config of other stacks).
-const STATIC_OK = /^[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(html|js|css|png|svg|ico)$/;
+const STATIC_OK = /^(?:fonts\/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(html|js|css|png|svg|ico|woff2)$/;
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
@@ -171,7 +172,7 @@ export async function createApp(overrides = {}) {
       c = { mtime: st.mtimeMs, buf, etag: `"${crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16)}"` };
       fileCache.set(file, c);
     }
-    const headers = { 'Content-Type': MIME[path.extname(name)] || 'application/octet-stream', 'Cache-Control': 'no-cache', ETag: c.etag, ...SECURITY_HEADERS };
+    const headers = { 'Content-Type': MIME[path.extname(name)] || 'application/octet-stream', 'Cache-Control': name.endsWith('.woff2') ? 'public, max-age=604800' : 'no-cache', ETag: c.etag, ...SECURITY_HEADERS };
     if (req.headers['if-none-match'] === c.etag) { res.writeHead(304, headers); return res.end(); }
     res.writeHead(200, { ...headers, 'Content-Length': c.buf.length });
     res.end(req.method === 'HEAD' ? undefined : c.buf);

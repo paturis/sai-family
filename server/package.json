@@ -12,13 +12,15 @@
     "test": "node --disable-warning=ExperimentalWarning --test --test-force-exit \"test/*.test.js\"",
     "cli": "node --disable-warning=ExperimentalWarning src/cli.js",
     "loadtest": "node loadtest/phones.js",
-    "e2e": "node --disable-warning=ExperimentalWarning test/e2e/browser.mjs"
+    "e2e": "node --disable-warning=ExperimentalWarning test/e2e/browser.mjs",
+    "shots": "node --disable-warning=ExperimentalWarning test/e2e/shots.mjs"
   },
   "dependencies": {
     "nodemailer": "^10.6.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "puppeteer-core": "^25.18.1",
     "smtp-server": "^3.21.7"
   }
 }
