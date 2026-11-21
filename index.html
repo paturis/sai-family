@@ -605,7 +605,7 @@ let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){
 saved=saved||{};
 const A={stage:'login',user:null,role:'admin',tab:'surveys',surveys:[],bank:[],team:[],gsurveys:[],gbank:[],gf:null,gform:null,gs:null,gfilt:{q:'',tag:''},filt:{q:'',kind:'',tag:''},qf:null,form:null,sv:null,
   secs:saved.secs||45,pts:saved.pts||'pct',tabQ:0,raw:null,groups:{},q:-1,phase:'idle',closesAt:0,count:0,status:'',sim:true,surveyId:null,busy:false};
-let gT=null,gdT=null,SEL={},proj=false,tickT=null,pollT=null,simT=null,nextId=1,grpT=null,gameT=null;
+let gT=null,gdT=null,SEL={},tickT=null,pollT=null,simT=null,nextId=1,grpT=null,gameT=null;
 const $=id=>document.getElementById(id);
 const root=()=>$('r0');
 function persistA(){try{localStorage.setItem(KEY,JSON.stringify({secs:A.secs,pts:A.pts,surveyId:A.surveyId,resume:A.stage}))}catch(e){}}
@@ -800,7 +800,6 @@ function bar(extra){
   const here=A.stage;
   return`<div class="r0-top"><div class="r0-brand"><span class="sssio-logo" role="img" aria-label="SSSIO"></span><div><div class="r0-kicker">SSSIO Game Show</div><div class="r0-sub">${A.sv&&['lobby','collect','tabulate','gate'].includes(here)?'Survey: '+esc(A.sv.name)+' · Contestants wait outside the hall during Round 0':'Create surveys, run the audience round and play the game'}</div></div></div>
   <div class="r0-top-actions">${Cloud.mode==='memory'?'<span class="r0-chip warn">PRACTICE MODE · this browser only</span>':''}${A.user&&(Cloud.mode==='firebase'||Cloud.mode==='server')?'<span class="r0-chip">'+esc(A.user.email)+' · '+esc(A.role)+(A.realRole&&A.realRole!==A.role?' (preview)':'')+'</span>':''}${viewAsSel()}${projBar(here)}${Cloud.mode==='server'?'<span class="r0-chip" data-sync></span>'+aiChip()+(A.role==='admin'?mailChip():''):''}${A.sv&&A.sv.code?'<button class="btn small" data-a="links">🔗 Links</button>':''}${extra||''}
-  ${['lobby','collect'].includes(here)?'<button class="btn small" data-a="proj">⛶ Projector view</button>':''}
   ${!['login','denied','dash'].includes(here)?'<button class="btn small" data-a="dash">☰ Dashboard</button>':''}
   ${here==='dash'?'<button class="btn small" data-a="togame">← Back to game screen</button>':''}
   ${A.user?'<button class="btn small" data-a="signout">Sign out</button>':''}</div></div>`}
@@ -1030,10 +1029,10 @@ function paint(){
   syncHeaderRole();
   const r=root();if(!r)return;
   if(A.stage==='off'){r.classList.add('hidden');document.body.classList.remove('r0-open');stopTimers();return}
-  r.classList.remove('hidden');document.body.classList.add('r0-open');r.classList.toggle('proj',proj);r.classList.toggle('stage',['lobby','collect','gate'].includes(A.stage));
+  r.classList.remove('hidden');document.body.classList.add('r0-open');r.classList.toggle('stage',['lobby','collect','gate'].includes(A.stage));
   const f={login:vLogin,denied:vDenied,hostonly:vHostOnly,dash:vDash,qform:vQForm,sform:vForm,survey:vSurvey,lobby:vLobby,collect:vCollect,tabulate:vTabulate,gate:vGate,gform:vGForm,gitem:vGItem,gsession:vGSession,gplay:vGPlay}[A.stage]||vLogin;
   const keep=document.activeElement&&document.activeElement.id&&['fq','sq','svName','gq','gsq','gName'].includes(document.activeElement.id)?document.activeElement.id:null;
-  r.innerHTML=f()+(proj?'<button class="r0-unproj" data-a="proj">Show controls (Esc)</button>':'');
+  r.innerHTML=f();
   if(keep){const e=$(keep);if(e){e.focus();const v=e.value;e.value='';e.value=v}}
   if(A.stage==='collect')startTimers();else stopTimers();syncChipRefresh();aiHealthMaybe();ensureStats();updateStatsDom()}
 function stopTimers(){clearInterval(tickT);clearInterval(pollT);tickT=pollT=null}
@@ -1257,7 +1256,6 @@ document.addEventListener('click',async e=>{
     case 'signout':try{await Cloud.signOut()}catch(err){}A.user=null;A.stage='login';A.sv=null;paint();return;
     case 'dash':return guard(goDash,'Could not load');
     case 'togame':A.stage='off';paint();return;
-    case 'proj':proj=!proj;return paint();
     case 'tab':if(b.dataset.t){A.tab=b.dataset.t;A.status='';paint()}else{A.tabQ=Number(b.dataset.i);SEL={};paint()}return;
     /* question bank */
     case 'newq':if(!isAdmin())return;A.qf={kind:'round',multiplier:1,source:'discourse',tags:[],answers:[],en:'',category:''};A.stage='qform';paint();return;
@@ -1368,7 +1366,6 @@ document.addEventListener('change',e=>{const t=e.target;if(!root()||!root().cont
   if(t.dataset.a==='pts'){A.pts=t.value;persistA();saveGroupsSoon();paint();return}
   if(t.dataset.a==='teamname'){S.teams[t.dataset.t].name=t.value.trim()||('Team '+t.dataset.t);render();return}});
 document.addEventListener('keydown',e=>{const r=root();if(!r||r.classList.contains('hidden'))return;
-  if(e.key==='Escape'&&proj){proj=false;paint()}
   if(!e.target.matches('input,textarea,select'))e.stopPropagation()},true);
 const lbtn=$('linksBtn');if(lbtn)lbtn.onclick=showLinks;
 const vsel=$('viewAsSel');if(vsel)vsel.onchange=()=>setViewAs(vsel.value);
