@@ -50,7 +50,25 @@ export async function createApp(overrides = {}) {
   const db = overrides.db || openDb(config.dataDir);
   const secret = loadSecret(config);
   const hub = new Hub();
-  const store = createStore({ db, hub, closeGraceMs: config.closeGraceMs, answerGraceMs: config.answerGraceMs });
+  /* Live numbers for the projector, the emcee and the tech: answers so far for the open question and how many devices are
+     connected. Recomputed at most 4 times a second, and only while someone is watching. */
+  const statsTimers = new Map();
+  const statsFor = (code) => {
+    const l = store.live.get(code);
+    const q = l && Number.isInteger(l.q) ? l.q : -1;
+    return { q, count: q >= 0 ? store.answers.count(code, q) : 0, devices: hub.count('live:' + code, { audienceOnly: true }) };
+  };
+  const statsSoon = (code) => {
+    if (statsTimers.has(code) || !hub.count('stats:' + code)) return;
+    const t = setTimeout(() => {
+      statsTimers.delete(code);
+      if (hub.count('stats:' + code)) hub.publish('stats:' + code, statsFor(code));
+    }, 250);
+    t.unref?.();
+    statsTimers.set(code, t);
+  };
+  const store = createStore({ db, hub, closeGraceMs: config.closeGraceMs, answerGraceMs: config.answerGraceMs, onEvent: (kind, code) => statsSoon(code) });
+  hub.onChange = (ch) => { if (ch.startsWith('live:')) statsSoon(ch.slice(5)); };
   const auth = createAuth({ db, config, secret });
   const ai = createAI({ config, store, db, fetchImpl: overrides.fetchImpl });
   const mailer = createMailer({ config, transportFactory: overrides.mailTransport });
@@ -200,6 +218,7 @@ export async function createApp(overrides = {}) {
   const docFor = (ch) => {
     const [kind, id] = ch.split(':');
     if (kind === 'live') return store.live.get(id);
+    if (kind === 'stats') return statsFor(id);
     if (kind === 'display') return store.display.get(id);
     if (kind === 'game') return store.data.get(id, 'game');
     return null;
@@ -209,7 +228,7 @@ export async function createApp(overrides = {}) {
     if (typeof ch !== 'string' || ch.length > 60) return false;
     const i = ch.indexOf(':');
     const kind = ch.slice(0, i), id = ch.slice(i + 1);
-    if (kind === 'live' || kind === 'display') return okCode(id);
+    if (kind === 'live' || kind === 'display' || kind === 'stats') return okCode(id);
     if (kind === 'game') return !!ws.user && /^[A-Za-z0-9_-]{4,40}$/.test(id);
     return false;
   };
@@ -239,6 +258,7 @@ export async function createApp(overrides = {}) {
       if (m.t === 'sub') {
         if (!channelAllowed(ws, m.ch)) return ws.send(JSON.stringify({ t: 'err', ch: m.ch, code: 'forbidden' }));
         if (ws.chs && ws.chs.size >= 8 && !ws.chs.has(m.ch)) return;
+        if (m.screen === true) ws.screen = true; // projector / emcee / tech: not counted as audience phones
         hub.subscribe(ws, m.ch);
         return ws.send(JSON.stringify({ t: 'doc', ch: m.ch, data: docFor(m.ch) ?? null }));
       }
@@ -260,6 +280,7 @@ export async function createApp(overrides = {}) {
     listen: () => new Promise((resolve) => server.listen(config.port, config.host, () => resolve(server.address().port))),
     close: async () => {
       clearInterval(beat); clearInterval(reset);
+      for (const t of statsTimers.values()) clearTimeout(t);
       store.close();
       for (const ws of wss.clients) ws.terminate();
       await new Promise((r) => server.close(r));

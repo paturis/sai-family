@@ -38,7 +38,7 @@
   }
 
   /* ---------- realtime ---------- */
-  var ws = null, subs = {}, last = {}, tries = 0, reconnectT = null, hbT = null, pongT = null, closed = false;
+  var ws = null, subs = {}, meta = {}, last = {}, tries = 0, reconnectT = null, hbT = null, pongT = null, closed = false;
   function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
   function stopHb() { clearInterval(hbT); clearTimeout(pongT); }
   function startHb() {
@@ -62,7 +62,7 @@
     try { mine = ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); } catch (e) { schedule(); return; }
     mine.onopen = function () {
       tries = 0; wsState = 'online'; emit(); startHb();
-      Object.keys(subs).forEach(function (ch) { send({ t: 'sub', ch: ch }); });
+      Object.keys(subs).forEach(function (ch) { send({ t: 'sub', ch: ch, screen: !!meta[ch] }); });
     };
     mine.onmessage = function (ev) {
       var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
@@ -74,14 +74,15 @@
     mine.onclose = function () { if (ws === mine) { wsState = 'offline'; stopHb(); emit(); schedule(); } };
     mine.onerror = function () { try { mine.close(); } catch (e) { /* ignore */ } };
   }
-  function subscribe(ch, cb) {
+  function subscribe(ch, cb, opts) {
+    if (opts && opts.screen) meta[ch] = true;
     (subs[ch] = subs[ch] || []).push(cb);
     if (last[ch]) { var v = last[ch].v; setTimeout(function () { cb(v); }, 0); }
     connect();
-    if (subs[ch].length === 1) send({ t: 'sub', ch: ch });
+    if (subs[ch].length === 1) send({ t: 'sub', ch: ch, screen: !!meta[ch] });
     return function unsubscribe() {
       subs[ch] = (subs[ch] || []).filter(function (x) { return x !== cb; });
-      if (!subs[ch].length) { delete subs[ch]; delete last[ch]; send({ t: 'unsub', ch: ch }); }
+      if (!subs[ch].length) { delete subs[ch]; delete last[ch]; delete meta[ch]; send({ t: 'unsub', ch: ch }); }
     };
   }
   /** Stop reconnecting and close the socket (used by tests and when a page is torn down). */

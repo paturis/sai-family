@@ -49,6 +49,12 @@ input{font:inherit;color:#fff}
 .live{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--teal-on-dark);margin-right:7px;animation:p 1.6s infinite}
 @keyframes p{50%{opacity:.25}}
 @media(prefers-reduced-motion:reduce){.live{animation:none}}
+
+.erow{display:flex;gap:14px;margin:14px 0 4px}
+.enum{flex:1;text-align:center;padding:12px 8px;border-radius:var(--r-lg);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14)}
+.enum b{display:block;font:700 44px/1 var(--font-head);color:var(--teal-on-dark);font-variant-numeric:tabular-nums}
+.enum.t b{color:var(--orange-on-dark)}
+.enum span{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#b9ccd5}
 </style>
 <script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script>
 <script>/* games.js - the game registry shared by the host console (index), the emcee view and the projector display.
@@ -325,7 +331,7 @@ G.register({
 <script>
 'use strict';
 var FB='https://www.gstatic.com/firebasejs/10.12.2/';
-var app=document.getElementById('app'),B=null,state={stage:'login',user:null,surveys:[],sv:null,S:null,unsub:null,msg:''};
+var app=document.getElementById('app'),B=null,state={stage:'login',user:null,surveys:[],sv:null,S:null,unsub:null,msg:'',L:null,ST:null,offset:0,subs:[],poll:null,tick:null};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 
 function topBar(){return '<div class="top"><div style="display:flex;align-items:center;gap:10px"><span class="sssio-logo"></span><div><div class="k">SSSIO · EMCEE VIEW</div><div class="small">'+(state.user?esc(state.user.email)+' · read-only':'Read-only live view of the game board')+'</div></div></div><div>'+
@@ -335,11 +341,39 @@ function draw(){
   if(state.stage==='login')h+='<div class="card"><h1>Game host sign-in</h1>'+(window.BACKEND==='server'?serverLogin():'<p class="small">Sign in with the Google account an admin approved for you. This screen shows the hidden answers, so it is not public.</p><button class="gold" data-a="in">Sign in with Google</button>')+'<div class="small" style="color:var(--coral);margin-top:10px">'+esc(state.msg)+'</div><div class="small" style="color:#7ee0b5;margin-top:8px">'+esc(state.note||'')+'</div></div>';
   else if(state.stage==='denied')h+='<div class="card"><h1>Not approved</h1><p class="small">'+esc(state.user&&state.user.email)+' has not been approved as a host. Ask an admin to add you.</p></div>';
   else if(state.stage==='list'){
-    h+='<div class="card"><h1>Choose the game</h1><p class="small">Games whose board is ready appear here. You will follow the board live as the IT tech runs it.</p><div class="list">'+
-      (state.surveys.map(function(s){return '<button data-a="open" data-id="'+esc(s.id)+'">'+(s.game&&window.GAMES&&GAMES[s.game]?GAMES[s.game].icon+' ':'')+esc(s.name)+'<div class="small">'+s.questions.length+' questions</div></button>'}).join('')||'<p class="small">No game is ready yet.</p>')+'</div><button data-a="refresh">Refresh</button></div>';
-  }else if(state.stage==='game')h+=game();
+    h+='<div class="card"><h1>Choose the show</h1><p class="small">A running survey or a game that is ready appears here. You follow it live as the IT tech runs it — it switches to the board by itself when the game starts.</p><div class="list">'+
+      (state.surveys.map(function(s){return '<button data-a="open" data-id="'+esc(s.id)+'">'+(s.game&&window.GAMES&&GAMES[s.game]?GAMES[s.game].icon+' ':'')+esc(s.name)+'<div class="small">'+(s.status==='live'?'● Survey in progress':'Game ready')+' · '+(s.questions||[]).length+' questions</div></button>'}).join('')||'<p class="small">Nothing is running yet. Pull down or tap Refresh when the tech starts.</p>')+'</div><button data-a="refresh">Refresh</button></div>';
+  }else if(state.stage==='survey')h+=surveyView();
+  else if(state.stage==='game')h+=game();
   app.innerHTML=h}
 
+/* ---------- the audience survey, as the emcee needs it ---------- */
+function eLeft(){var L=state.L;return L&&L.closesAt?Math.max(0,Math.ceil((L.closesAt-(Date.now()+state.offset))/1000)):0}
+function eCount(){var L=state.L,ST=state.ST;return ST&&L&&ST.q===L.q?ST.count:0}
+function surveyView(){
+  var L=state.L,ST=state.ST,sv=state.sv,h='<div class="small" style="margin:0 2px 8px"><span class="live"></span>Live · '+esc(sv.name)+'</div>',proj='';
+  if(L&&L.show==='intermission')proj='Projector shows: intermission';else if(L&&L.show==='blank')proj='Projector is blank';
+  if(!L)return h+'<div class="card"><h1>Audience survey</h1><p class="small">Connecting…</p></div>';
+  var body='';
+  if(L.phase==='idle')body='<div class="cat">THE AUDIENCE IS JOINING</div><div class="q">Waiting for the first question</div><p class="small">The join code is on the projector. Phones connected: <b id="edev">'+(ST?ST.devices:0)+'</b></p>';
+  else if(L.phase==='open')body='<div class="cat">QUESTION '+(L.q+1)+(L.total?' OF '+L.total:'')+'</div><div class="q">'+esc((L.question&&L.question.en)||'')+'</div>'+
+    '<div class="erow"><div class="enum"><b id="ecount">'+eCount()+'</b><span>answers</span></div><div class="enum t"><b id="etime">'+eLeft()+'</b><span>seconds</span></div></div>';
+  else if(L.phase==='closed')body='<div class="cat">TIME IS UP</div><div class="q">Question '+(L.q+1)+' is closed</div><p class="small"><b>'+eCount()+'</b> answers received. The tech will open the next question.</p>';
+  else body='<div class="cat">SURVEY COMPLETE</div><div class="q">Thank the audience</div><p class="small">'+(L.stage==='gate'?'The board is loaded. Invite the contestants up — the game starts when the tech begins.':'The tech is counting the votes. This page will switch to the game board by itself.')+'</p>';
+  return h+'<div class="card">'+body+(proj?'<div class="ok">'+proj+'</div>':'')+'</div>'}
+function stopSurvey(){state.subs.forEach(function(f){try{f()}catch(e){}});state.subs=[];clearInterval(state.poll);clearInterval(state.tick);state.L=null;state.ST=null}
+function openShow(sv){
+  if(state.unsub){state.unsub();state.unsub=null}stopSurvey();state.sv=sv;state.S=null;
+  if(sv.status==='live'&&sv.code&&B.watchLive){
+    state.stage='survey';draw();
+    state.subs.push(B.watchLive(sv.code,function(l){state.L=l;if(l&&l.hostNow)state.offset=l.hostNow-Date.now();draw()}));
+    if(B.watchStats)state.subs.push(B.watchStats(sv.code,function(st){state.ST=st;var c=document.getElementById('ecount'),d=document.getElementById('edev');if(c)c.textContent=eCount();if(d&&st)d.textContent=st.devices}));
+    state.tick=setInterval(function(){var t=document.getElementById('etime');if(t)t.textContent=eLeft()},300);
+    // when the tech loads the board (status becomes "ready") follow it automatically
+    state.poll=setInterval(function(){B.getSurvey(sv.id).then(function(x){if(x&&x.status==='ready')openShow(x)}).catch(function(){})},4000);
+  }else{
+    state.stage='game';draw();
+    state.unsub=B.watchGame(sv.id,function(g){state.S=g&&g.S||null;draw()})}}
 function game(){
   var S=state.S;
   if(S&&S.game&&window.GAMES&&GAMES[S.game])return '<div class="small" style="margin:0 2px 8px"><span class="live"></span>Live · '+esc(state.sv.name)+'</div>'+GAMES[S.game].host(S);
@@ -365,13 +399,12 @@ app.addEventListener('click',function(e){
   var b=e.target.closest('[data-a]');if(!b)return;var a=b.dataset.a;
   if(a==='mail'){var em=((document.getElementById('loginMail')||{}).value||'').trim();state.msg='';state.note='';if(!em){state.msg='Enter your email address.';draw();return}B.requestLink(em).then(function(){state.note='If that address is approved, a sign-in link is on its way. Check your inbox (and junk folder). It works once.';draw()},function(err){state.msg=String(err.message||err);draw()})}
   else if(a==='in')B.signIn((document.getElementById('loginTok')||{}).value).catch(function(err){state.msg='Sign-in failed: '+(err.message||err);draw()});
-  else if(a==='out'){if(state.unsub)state.unsub();B.signOut().then(function(){state.user=null;state.stage='login';state.sv=null;draw()})}
+  else if(a==='out'){if(state.unsub)state.unsub();stopSurvey();B.signOut().then(function(){state.user=null;state.stage='login';state.sv=null;draw()})}
   else if(a==='refresh')loadList();
-  else if(a==='back'){if(state.unsub)state.unsub();state.sv=null;state.S=null;state.stage='list';loadList()}
-  else if(a==='open'){var sv=state.surveys.filter(function(s){return s.id===b.dataset.id})[0];state.sv=sv;state.S=null;state.stage='game';draw();
-    if(state.unsub)state.unsub();state.unsub=B.watchGame(sv.id,function(g){state.S=g&&g.S||null;draw()})}
+  else if(a==='back'){if(state.unsub)state.unsub();stopSurvey();state.sv=null;state.S=null;state.stage='list';loadList()}
+  else if(a==='open'){var sv=state.surveys.filter(function(s){return s.id===b.dataset.id})[0];if(sv)openShow(sv)}
 });
-function loadList(){B.listReady().then(function(l){state.surveys=l;state.stage='list';draw()}).catch(function(e){state.msg=String(e.message||e);state.stage='list';draw()})}
+function loadList(){(B.listActive||B.listReady)().then(function(l){state.surveys=l;state.stage='list';draw()}).catch(function(e){state.msg=String(e.message||e);state.stage='list';draw()})}
 function onUser(u){
   if(!u){state.user=null;state.stage='login';draw();return}
   state.user=u;B.getRole(u).then(function(r){if(r==='host'||r==='tech'||r==='admin')loadList();else{state.stage='denied';draw()}})}
@@ -386,6 +419,9 @@ async function firebaseBackend(){
     onAuth:function(cb){Au.onAuthStateChanged(auth,function(u){cb(u&&!u.isAnonymous?{email:(u.email||'').toLowerCase(),name:u.displayName}:null)})},
     getRole:function(u){return F.getDoc(F.doc(db,'admins',u.email)).then(function(s){var r=s.exists()?s.data().role:null;return ['admin','tech','host'].indexOf(r)>=0?r:null}).catch(function(){return null})},
     listReady:function(){return F.getDocs(F.query(F.collection(db,'surveys'),F.where('status','==','ready'))).then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data())})})},
+    listActive:function(){return F.getDocs(F.query(F.collection(db,'surveys'),F.where('status','in',['live','ready']))).then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data())})})},
+    getSurvey:function(id){return F.getDoc(F.doc(db,'surveys',id)).then(function(s){return s.exists()?Object.assign({id:id},s.data()):null})},
+    watchLive:function(code,cb){return F.onSnapshot(F.doc(db,'live',code),function(s){cb(s.exists()?s.data():null)},function(){cb(null)})},
     watchGame:function(id,cb){return F.onSnapshot(F.doc(db,'surveys',id,'data','game'),function(s){cb(s.exists()?JSON.parse(s.data().json):null)},function(){cb(null)})}
   }}
 function serverLogin(){
@@ -401,6 +437,10 @@ function serverBackend(){
     onAuth:function(cb){C.authInit(function(u){if(!u&&C.authError())state.msg=C.authError();cb(u)})},
     getRole:function(u){return Promise.resolve(u&&u.role||null)},
     listReady:function(){return C.rpc('listReady')},
+    listActive:function(){return C.rpc('listActive')},
+    getSurvey:function(id){return C.rpc('getSurvey',id)},
+    watchLive:function(code,cb){return C.subscribe('live:'+code,cb,{screen:true})},
+    watchStats:function(code,cb){return C.subscribe('stats:'+code,cb,{screen:true})},
     watchGame:function(id,cb){return C.subscribe('game:'+id,cb)}
   }}
 (async function(){

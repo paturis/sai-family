@@ -55,6 +55,26 @@ revocable the moment you remove someone, which a self-contained signed token cou
 Roles: **admin** does everything, **tech** runs the show (no bank edits, no creating or deleting surveys), **host** is the
 read-only emcee screen (`/emcee.html`).
 
+## The four screens on the day
+
+Each person has their own screen, and each screen has one job. The **Links** button in the tech console lists all the addresses.
+
+1. **Projector laptop** — open `/display.html?code=XXXXX` once, press **F** for full screen, and leave it. It needs no sign-in and
+   no one touches it. By itself it shows: a "welcome" screen, the join **QR code** and code (with a live count of phones that have
+   joined), each survey **question** with the live answer count and countdown, "Counting the votes", "Contestants, please come up",
+   and then the game board, strikes, scores and the steal banner. It keeps the screen awake and reconnects on its own.
+2. **Tech laptop** — the console (`/`). Sees everything and controls everything: the survey, the board with the hidden answers
+   dimmed, strikes, awards, score corrections, timers, and a **live preview of the projector** with an Intermission / Blank override.
+3. **Emcee phone** — `/emcee.html`, signed in as a host. Follows the survey (question, answer count, seconds left), then switches
+   to the board by itself when the game starts, showing the hidden answers, strikes and scores. Read-only.
+4. **Audience phones** — the QR code. One short answer per question, then live scores.
+
+### Taking mistakes back (tech)
+Everything the tech does on the board can be undone: reveals, hides, strikes, who has control, awarding a round (even to the wrong
+team), score corrections and Fast Money. **Z** or **Ctrl/⌘+Z** undoes the last action, **Shift+Z** redoes it, and the sidebar shows the
+last action plus a list of recent ones. **X** adds a strike and **Shift+X** removes one. After an award the sidebar says
+"Wrong team? Press Undo." The projector and emcee follow every undo instantly.
+
 ## Check it works BEFORE the event
 
 - **AI:** the top bar shows `AI ✓ ready`. If it shows ✗, click **🩺 AI status** on the tabulate screen: it says exactly what
@@ -68,6 +88,7 @@ read-only emcee screen (`/emcee.html`).
   docker compose exec app node src/cli.js remove-user loadtest
   ```
   Expect `PASS`. Run it while your other services are busy to see the real picture on a shared VPS.
+- **All four screens, automated:** `cd server && npm run e2e:views` runs a whole show (tech, projector, emcee, audience) in real browsers and checks every stage and every undo.
 - **Real phones:** 10+ people on the venue wifi (or mobile data), full 45-minute run with a stopwatch.
 
 ## Day to day

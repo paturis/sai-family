@@ -76,6 +76,7 @@ export function createRpc({ store, auth, ai, mailer, config }) {
     /* surveys */
     listSurveys: [ANY, () => store.surveys.list()],
     listReady: [ANY, () => store.surveys.list().filter((s) => s.status === 'ready')],
+    listActive: [ANY, () => store.surveys.list().filter((s) => s.status === 'live' || s.status === 'ready')],
     getSurvey: [ANY, (user, id) => store.surveys.get(str(id))],
     createSurvey: [ADMIN, (user, o) => store.surveys.create(obj(o))],
     updateSurvey: [STAFF, (user, id, patch) => { store.surveys.update(str(id), obj(patch)); return true; }],

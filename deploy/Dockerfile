@@ -9,7 +9,7 @@ RUN cd server && npm ci --omit=dev && npm cache clean --force
 
 # the server and the four web pages it serves
 COPY server/src ./server/src
-COPY index.html play.html display.html emcee.html backend-config.js firebase-config.js server-client.js theme.css console.css ./web/
+COPY index.html play.html display.html emcee.html backend-config.js firebase-config.js server-client.js qr.js theme.css console.css ./web/
 COPY fonts ./web/fonts
 
 RUN mkdir -p /data && chown -R node:node /data

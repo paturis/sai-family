@@ -99,6 +99,12 @@ test('data round-trips the way the app expects (same shapes as Firestore)', asyn
     assert.equal(sv.id, sid);
     assert.ok(sv.createdAt);
     assert.equal((await admin.rpc('listReady')).body.r.length, 1);
+    await admin.rpc('updateSurvey', sid, { status: 'live' });
+    assert.equal((await admin.rpc('listReady')).body.r.length, 0);
+    assert.equal((await admin.rpc('listActive')).body.r.length, 1, 'a running survey is visible to the emcee');
+    await admin.rpc('updateSurvey', sid, { status: 'closed' });
+    assert.equal((await admin.rpc('listActive')).body.r.length, 0);
+    await admin.rpc('updateSurvey', sid, { status: 'ready' });
 
     assert.equal((await admin.rpc('getData', sid, 'groups')).body.r, null);
     await admin.rpc('setData', sid, 'groups', { groups: { 0: [] }, nextId: 3 });

@@ -333,3 +333,29 @@ body.presentation .presentation-exit{display:block}
 .top .brand-title{font-size:24px;white-space:nowrap}
 .top .top-actions{flex:1 1 auto;max-width:none}
 @media(max-width:900px){.top .brand{flex:1 1 100%}.top .brand-title{white-space:normal}}
+
+/* ================= take-it-back controls, steal banner, projector panel ================= */
+.side{display:grid;gap:14px;align-content:start}
+body.presentation .side{display:none}
+.undo-bar{display:flex;gap:8px;margin:0 0 6px}
+.undo-bar .btn{flex:1;font-size:14px;padding:10px 12px}
+.last-action{font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.4}
+.last-action b{color:var(--navy)}
+.hist{margin:0 0 12px;font-size:12.5px}
+.hist summary{cursor:pointer;color:var(--blue);font-weight:600}
+.hist ol{margin:8px 0 0;padding-left:20px;color:var(--text);line-height:1.6}
+.hist li span{color:var(--muted);font-size:11.5px;margin-left:4px}
+.steal-banner{margin:18px 30px 0;padding:12px 16px;border-radius:var(--r);background:rgba(180,50,44,.28);border:1px solid #ff8a80;color:#fff;font-size:15px;line-height:1.45;animation:stealpulse 1.6s ease-in-out infinite}
+.steal-banner b:first-child{font:700 20px var(--font-head);letter-spacing:.06em;color:#ffd0cb;margin-right:6px}
+@keyframes stealpulse{50%{box-shadow:0 0 0 6px rgba(255,138,128,.2)}}
+.awarded-note{margin:8px 0 2px;padding:9px 12px;border-radius:var(--r);background:var(--ok-bg);color:var(--ok);font-size:13px;line-height:1.45}
+.adj-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0;font-size:14px}
+.adj-row b{font:700 20px var(--font-head);color:var(--orange-d);margin-left:6px}
+.adj-btns{display:flex;gap:4px}
+.proj-now{font-size:13px;margin-bottom:10px}
+.proj-now b{color:var(--navy)}
+.proj-preview{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;margin-top:12px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--navy)}
+.proj-preview iframe{position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;transform-origin:0 0;transform:scale(var(--s,.15));pointer-events:none}
+.joined-line{font:600 22px var(--font);color:var(--teal-on-dark);margin:6px 0 0}
+.panel .viewas{display:flex;margin:0 0 10px;padding:0}
+.panel .viewas select{flex:1}

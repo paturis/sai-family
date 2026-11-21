@@ -60,8 +60,37 @@ html,body{background:radial-gradient(ellipse 90% 60% at 50% -10%,var(--navy-600)
 input{font:inherit;font-size:20px;padding:12px;border-radius:var(--r);border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;text-align:center;text-transform:uppercase;width:220px}
 button{font:inherit;font-weight:700;border:0;border-radius:var(--r);background:var(--orange);color:var(--navy);padding:12px 22px;font-size:16px;margin-left:8px;cursor:pointer}
 @media(prefers-reduced-motion:reduce){.a.on,.banner,.fx{animation:none}.fx{display:none}}
+
+/* ----- continuous projector: lobby, question, breaks ----- */
+.center{margin:auto;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2.4vh}
+.big{font:700 clamp(40px,6.4vw,110px)/1.04 var(--font-head);color:#fff;margin:0}
+.sub{font-size:clamp(18px,2.4vw,40px);color:var(--orange-on-dark);margin:0;font-weight:600}
+.lobby{flex:1;display:grid;grid-template-columns:minmax(260px,34vw) 1fr;gap:5vw;align-items:center}
+.qr{background:#fff;padding:1.6vw;border-radius:var(--r-lg);box-shadow:var(--shadow-lg)}
+.qr svg,.qr-corner svg{display:block;width:100%;height:auto}
+.lobby-text .big{margin:1vh 0}
+.how{font-size:clamp(16px,2vw,32px);line-height:1.5;color:#e3ecf0;margin:3vh 0 2vh}
+.how b{color:var(--orange-on-dark)}
+.how .code{font:700 1.5em var(--font-head);letter-spacing:.14em}
+.joined{display:inline-block;margin-top:1vh;font-size:clamp(16px,1.9vw,30px);color:#d8e6ec;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:.6vh 1.6vw}
+.joined b{font-family:var(--font-head);color:var(--teal-on-dark);font-size:1.4em;margin-right:.4em}
+.bigq{font-size:clamp(32px,5.2vw,86px)!important;margin:3vh auto!important}
+.qrow{display:flex;justify-content:center;align-items:center;gap:7vw;margin-top:3vh}
+.qcount{display:flex;align-items:center;gap:1.4vw}
+.qcount b{font:700 clamp(60px,9vw,150px)/1 var(--font-head);color:var(--teal-on-dark);font-variant-numeric:tabular-nums}
+.qcount span{font-size:clamp(14px,1.8vw,28px);color:#d0dde4;line-height:1.25}
+.qtime{font:700 clamp(60px,9vw,150px)/1 var(--font-head);color:var(--orange-on-dark);font-variant-numeric:tabular-nums;min-width:2ch;text-align:center}
+.qtime.u{color:#ff8a80}
+.qr-corner{position:fixed;right:2vw;bottom:3vh;width:min(11vw,150px);background:#fff;padding:.5vw;border-radius:var(--r);box-shadow:var(--shadow-lg)}
+.dots::after{content:"";animation:dots 1.4s steps(4,end) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+.hint{position:fixed;left:1.2vw;bottom:1.2vh;font-size:12px;color:#8fb1c0;opacity:0;animation:hint 9s ease 1s}
+@keyframes hint{0%{opacity:0}10%,80%{opacity:.9}100%{opacity:0}}
+.conn{position:fixed;top:1.2vh;right:1.2vw;background:rgba(180,50,44,.85);color:#fff;font-size:13px;font-weight:700;padding:5px 12px;border-radius:999px;z-index:20}
+body.idle{cursor:none}
+@media(max-width:800px){.lobby{grid-template-columns:1fr}}
 </style>
-<script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script>
+<script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script><script src="qr.js"></script>
 <script>/* games.js - the game registry shared by the host console (index), the emcee view and the projector display.
    Every game is a plug-in with the SAME contract:
      id, label, icon, itemLabel, fields[], kinds[], defaults
@@ -335,18 +364,19 @@ G.register({
 <div class="wrap" id="app"></div>
 <span class="sssio-logo corner" role="img" aria-label="SSSIO"></span>
 <div id="fx"></div>
+<div id="conn" class="conn hidden" role="status">Reconnecting…</div>
 <script>
 'use strict';
 var FB='https://www.gstatic.com/firebasejs/10.12.2/';
 var app=document.getElementById('app'),fxEl=document.getElementById('fx');
 var code=(new URLSearchParams(location.search).get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-var D=null,prevStrikes=0,prevKey='',timerT=null;
+var D=null,L=null,ST=null,offset=0,prevStrikes=0,prevKey='',timerT=null,qT=null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 
 function askCode(){app.innerHTML='<div class="wait"><h1>Scoreboard</h1><p>Enter the game code</p><input id="c" maxlength="5" autocomplete="off"><button id="g">Open</button></div>';
   document.getElementById('g').onclick=function(){var c=document.getElementById('c').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c)location.search='?code='+c}}
 function timeLeft(){if(!D||!D.timerRunning||!D.timerEndsAt)return D?D.timerSeconds:0;return Math.max(0,Math.ceil((D.timerEndsAt-Date.now())/1000))}
-function draw(){
+function drawGame(){
   if(D&&D.game&&window.GAMES&&GAMES[D.game]){clearInterval(timerT);app.innerHTML='<div class="gm-wrapdisp"><div class="cat" style="margin-bottom:1vh">'+esc(D.title||'')+'</div>'+GAMES[D.game].display(D)+'</div>';return}
   if(!D){app.innerHTML='<div class="wait"><div style="margin-bottom:2vh"><span class="sssio-logo xl"></span></div><h1>One Sai Family</h1><p>Survey Says! The game will begin shortly…</p></div>';return}
   var t=D.teams,ctl=D.round?D.round.control:null,tl=timeLeft(),showT=D.timerRunning||(D.timerSeconds&&D.timerSeconds<60&&D.timerEndsAt);
@@ -364,11 +394,56 @@ function draw(){
       (r.steal?'<div class="banner">STEAL — '+esc(t[r.stealTeam].name)+' gets one guess</div>':'')+
       '<div class="grid">'+r.answers.map(function(a,i){return a.on?'<div class="a on"><span class="rk">'+(i+1)+'</span><span class="t">'+esc(a.t)+'</span><span class="p">'+a.p+'</span></div>':'<div class="a off"><span class="rk">'+(i+1)+'</span><span class="t">••••••••</span><span class="p">?</span></div>'}).join('')+'</div>'+
       '<div class="foot"><div class="strikes">'+[0,1,2].map(function(i){return '<i class="'+(i<r.strikes?'on':'')+'">✕</i>'}).join('')+'</div>'+
-      '<div class="pts">Revealed points'+(r.mult>1?' (×'+r.mult+')':'')+' <b>'+r.answers.reduce(function(s,a){return s+(a.on?a.p:0)},0)*r.mult+'</b></div></div>'+
+      (r.awarded?'<div class="pts"></div>':'<div class="pts">Revealed points'+(r.mult>1?' (×'+r.mult+')':'')+' <b>'+r.answers.reduce(function(s,a){return s+(a.on?a.p:0)},0)*r.mult+'</b></div>')+'</div>'+
       (r.awarded?'<div class="ok">Round awarded to '+esc(t[r.awarded.team].name)+' (+'+r.awarded.points+')</div>':'');
   }
   app.innerHTML=h;
   clearInterval(timerT);if(D.timerRunning)timerT=setInterval(function(){var e=document.getElementById('tm'),l=timeLeft();if(e){e.textContent=String(l).padStart(2,'0')+'s';e.className='timer'+(l<=5?' u':'')}},500)}
+/* ---------- every stage of the show on one continuous screen ---------- */
+function joinUrl(){var u=new URL('play.html',location.href);u.search='?code='+code;u.hash='';return u.toString()}
+function shortUrl(){return joinUrl().replace(/^https?:\/\//,'').replace(/\?.*$/,'')}
+function qrHtml(cls){var s=window.qrSvgTag?window.qrSvgTag(joinUrl()):'';return s?'<div class="'+cls+'">'+s+'</div>':''}
+function qLeft(){return L&&L.closesAt?Math.max(0,Math.ceil((L.closesAt-(Date.now()+offset))/1000)):0}
+function answersNow(){if(!ST||!L)return null;return ST.q===L.q?ST.count:0}
+function pick(){
+  if(L&&L.show==='blank')return 'blank';
+  if(L&&L.show==='intermission')return 'break';
+  if(D)return 'game';
+  if(L){var p=L.phase;
+    if(p==='idle')return 'lobby';if(p==='open')return 'question';if(p==='closed')return 'closed';
+    if(p==='done'||p==='ended')return L.stage==='gate'?'gate':(L.stage==='tabulating'?'tabulating':'thanks')}
+  return 'wait'}
+function centered(h){return '<div class="center">'+h+'</div>'}
+function drawStage(n){
+  var logo='<div><span class="sssio-logo xl"></span></div>',h='',a=answersNow();
+  if(n==='blank'){app.innerHTML='';return}
+  if(n==='break')h=centered(logo+'<h1 class="big">We will be right back</h1><p class="sub">Please stay seated. Sai Ram.</p>');
+  else if(n==='wait')h=centered(logo+'<h1 class="big">One Sai Family</h1><p class="sub">Survey Says! The program will begin shortly…</p>');
+  else if(n==='lobby')h='<div class="lobby">'+qrHtml('qr')+'<div class="lobby-text"><div class="cat" style="text-align:left">THE AUDIENCE ROUND</div><h1 class="big">Scan to play</h1><p class="sub">Join the survey on your phone</p>'+
+    '<p class="how">or go to <b>'+esc(shortUrl())+'</b><br>and enter the code <b class="code">'+esc(code)+'</b></p>'+(ST&&ST.devices>0?'<div class="joined"><b id="dev">'+ST.devices+'</b> phones connected</div>':'')+'</div></div>';
+  else if(n==='question')h='<div class="cat">QUESTION '+(L.q+1)+(L.total?' OF '+L.total:'')+'</div><div class="q bigq">'+esc((L.question&&L.question.en)||'')+'</div>'+
+    '<div class="qrow">'+(a!=null?'<div class="qcount"><b id="qc">'+a+'</b><span>answers<br>so far</span></div>':'')+'<div class="qtime" id="qt">'+qLeft()+'</div></div>'+qrHtml('qr-corner');
+  else if(n==='closed')h=centered('<h1 class="big">Time is up</h1><p class="sub">Thank you! '+(a!=null?'<b>'+a+'</b> answers received.':'')+'</p>'+qrHtml('qr-corner'));
+  else if(n==='tabulating')h=centered(logo+'<h1 class="big">Counting the votes<span class="dots"></span></h1><p class="sub">Thank you, audience!</p>');
+  else if(n==='gate')h=centered(logo+'<h1 class="big">Thank you, audience!</h1><p class="sub">Contestants, please come up. The game is about to begin.</p>');
+  else if(n==='thanks')h=centered(logo+'<h1 class="big">Thank you!</h1><p class="sub">The game begins shortly.</p>');
+  app.innerHTML=h;
+  if(n==='question')qT=setInterval(function(){var e=document.getElementById('qt');if(e){var l=qLeft();e.textContent=l;e.className='qtime'+(l<=10?' u':'')}},300)}
+function draw(){var n=pick();clearInterval(timerT);clearInterval(qT);if(n==='game'){drawGame();return}drawStage(n)}
+function onLive(d){L=d;if(d&&d.hostNow)offset=d.hostNow-Date.now();draw()}
+function onStats(s){ST=s;var c=document.getElementById('qc'),v=document.getElementById('dev');
+  if(c&&s&&L&&s.q===L.q)c.textContent=s.count;if(v&&s)v.textContent=s.devices;
+  if(!c&&!v&&s&&(pick()==='lobby'||pick()==='question'||pick()==='closed'))draw()}
+/* keep the screen on, full screen on F / double-click, hide the mouse, show a quiet dot if the connection drops */
+function kiosk(){
+  var wl=function(){try{if(navigator.wakeLock)navigator.wakeLock.request('screen').catch(function(){})}catch(e){}};wl();
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)wl()});
+  var fs=function(){try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen()}catch(e){}};
+  document.addEventListener('keydown',function(e){if(e.key==='f'||e.key==='F')fs()});document.addEventListener('dblclick',fs);
+  var hint=document.createElement('div');hint.className='hint';hint.textContent='Press F for full screen';document.body.appendChild(hint);
+  var mt=null,idle=function(){document.body.classList.add('idle')};mt=setTimeout(idle,3000);
+  document.addEventListener('mousemove',function(){document.body.classList.remove('idle');clearTimeout(mt);mt=setTimeout(idle,3000)});
+  if(window.SrvClient&&window.BACKEND==='server')window.SrvClient.onStatus(function(s){var e=document.getElementById('conn');if(e)e.classList.toggle('hidden',s==='online')})}
 function onDoc(d){
   var key=d&&d.round?'r'+d.round.n:(d&&d.view);
   if(d&&d.round&&key===prevKey&&d.round.strikes>prevStrikes){fxEl.innerHTML='<div class="fx">'+new Array(Math.max(1,d.round.strikes)+1).join('<span>✕</span>')+'</div>';setTimeout(function(){fxEl.innerHTML=''},1150)}
@@ -379,11 +454,15 @@ async function firebaseBackend(){
   var A=await import(FB+'firebase-app.js'),F=await import(FB+'firebase-firestore.js'),Au=await import(FB+'firebase-auth.js');
   /* Named app = separate saved login. The default app's login belongs to the tech's Google session; signing in anonymously on it would sign the tech out of every tab. */
   var a=A.initializeApp(cfg,'audience'),db=F.getFirestore(a),auth=Au.getAuth(a);await Au.signInAnonymously(auth);
-  return{subscribe:function(c,cb){return F.onSnapshot(F.doc(db,'display',c),function(s){cb(s.exists()?s.data():null)},function(){cb(null)})}}}
+  return{subscribe:function(c,cb){return F.onSnapshot(F.doc(db,'display',c),function(s){cb(s.exists()?s.data():null)},function(){cb(null)})},
+    subscribeLive:function(c,cb){return F.onSnapshot(F.doc(db,'live',c),function(s){cb(s.exists()?s.data():null)},function(){})}}}
 (async function(){
   if(!code){askCode();return}
   draw();
-  var b;try{b=window.__displayMock||(window.BACKEND==='server'?{subscribe:function(c,cb){return window.SrvClient.subscribe('display:'+c,cb)}}:await firebaseBackend())}catch(e){app.innerHTML='<div class="wait"><h1>Could not connect</h1><p>'+esc(e.message)+'</p></div>';return}
+  var b;try{b=window.__displayMock||(window.BACKEND==='server'?{subscribe:function(c,cb){return window.SrvClient.subscribe('display:'+c,cb,{screen:true})},subscribeLive:function(c,cb){return window.SrvClient.subscribe('live:'+c,cb,{screen:true})},subscribeStats:function(c,cb){return window.SrvClient.subscribe('stats:'+c,cb,{screen:true})}}:await firebaseBackend())}catch(e){app.innerHTML='<div class="wait"><h1>Could not connect</h1><p>'+esc(e.message)+'</p></div>';return}
+  kiosk();
+  if(b.subscribeLive)b.subscribeLive(code,onLive);
+  if(b.subscribeStats)b.subscribeStats(code,onStats);
   b.subscribe(code,onDoc)})();
 </script>
 </body>

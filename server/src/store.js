@@ -23,7 +23,7 @@ export const okCode = (c) => typeof c === 'string' && CODE_RE.test(c);
  *  - buzz order uses the SERVER clock, first buzz wins (a phone cannot forge a time);
  *  - questions close by themselves on the server when the countdown ends.
  */
-export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500, now = () => Date.now() }) {
+export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500, now = () => Date.now(), onEvent = null }) {
   const cache = new Map();
   const S = (sql) => {
     let s = cache.get(sql);
@@ -110,6 +110,7 @@ export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500,
       S(`INSERT INTO live(code,json,updated_at) VALUES(?,?,?)
          ON CONFLICT(code) DO UPDATE SET json=excluded.json, updated_at=excluded.updated_at`).run(code, J(o), now());
       pub('live:' + code, o);
+      if (onEvent) onEvent('live', code);
       schedule(code);
     },
     update: (code, patch) => {
@@ -127,6 +128,7 @@ export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500,
       });
       pub('live:' + code, null);
       pub('display:' + code, null);
+      if (onEvent) onEvent('live', code);
     },
   };
 
@@ -198,6 +200,7 @@ export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500,
         S(`INSERT INTO answers(code,uid,q,a,t) VALUES(?,?,?,?,?)
            ON CONFLICT(code,uid,q) DO UPDATE SET a=excluded.a, t=excluded.t`).run(code, uid, q, text, t);
       }
+      if (onEvent) onEvent('answer', code);
     },
     count: (code, q) => S('SELECT count(*) AS n FROM answers WHERE code=? AND q=?').get(code, q).n,
     buzzes: (code, q) => S('SELECT uid,a,t FROM answers WHERE code=? AND q=? ORDER BY t').all(code, q).map(plain),

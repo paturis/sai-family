@@ -128,6 +128,43 @@ test('a full survey: phones answer, tech counts, buzz and results all work toget
   } finally { await s.close(); }
 });
 
+test('stats channel: live answer count and connected devices, public, throttled', async () => {
+  const s = await startApp();
+  try {
+    const tech = await login(s.app, s.base, 'tech1', 'tech');
+    await tech.rpc('liveSet', 'STAT1', { phase: 'open', q: 2, closesAt: Date.now() + 60000, question: { en: 'Q' } });
+    const screen = await client(s.base).ws();
+    sub(screen, 'stats:STAT1');
+    await until(() => docs(screen, 'stats:STAT1').length >= 1);
+    assert.deepEqual(docs(screen, 'stats:STAT1')[0].data, { q: 2, count: 0, devices: 0 });
+
+    // 3 phones join: devices go up
+    const phones = [];
+    for (let i = 0; i < 3; i++) { const p = await client(s.base).ws(); sub(p, 'live:STAT1'); phones.push(p); }
+    await until(() => (docs(screen, 'stats:STAT1').at(-1).data.devices === 3));
+
+    // 40 answers arrive in a burst: updates are batched, and the last one has the final count
+    await Promise.all(Array.from({ length: 40 }, (_, i) => client(s.base).post('/api/answer', { code: 'STAT1', q: 2, a: 'a' + i })));
+    await until(() => docs(screen, 'stats:STAT1').at(-1).data.count === 40);
+    const burst = docs(screen, 'stats:STAT1').length;
+    assert.ok(burst < 20, 'batched, not one message per answer (got ' + burst + ')');
+
+    // next question: the count restarts
+    await tech.rpc('liveUpdate', 'STAT1', { q: 3, phase: 'open' });
+    await until(() => docs(screen, 'stats:STAT1').at(-1).data.q === 3);
+    assert.equal(docs(screen, 'stats:STAT1').at(-1).data.count, 0);
+
+    // a phone leaving lowers the device count
+    phones[0].close();
+    await until(() => docs(screen, 'stats:STAT1').at(-1).data.devices === 2);
+    // nobody watching: no work is done and nothing breaks
+    screen.close();
+    await wait(50);
+    await client(s.base).post('/api/answer', { code: 'STAT1', q: 3, a: 'x' });
+    phones.forEach((p) => p.close());
+  } finally { await s.close(); }
+});
+
 test('static files: pages served, secrets and traversal blocked, backend switch is "server"', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-'));
   fs.writeFileSync(path.join(dir, 'index.html'), '<h1>hi</h1>');

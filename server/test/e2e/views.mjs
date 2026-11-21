@@ -1,0 +1,208 @@
+/* The whole show, with the four real screens in four separate browsers:
+     tech laptop (index.html)  ·  projector laptop (display.html)  ·  emcee phone (emcee.html)  ·  audience phones (simulated)
+   Checks that every screen shows the right thing at every stage, and that mistakes can be taken back.
+     node test/e2e/views.mjs        (needs Chrome; set CHROME_BIN if it is not in the usual place) */
+import puppeteer from 'puppeteer-core';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createApp } from '../../src/index.js';
+
+const CHROME = process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const app = await createApp({ dataDir: ':memory:', port: 0, host: '127.0.0.1', publicUrl: 'http://127.0.0.1', webRoot: root });
+const base = `http://127.0.0.1:${await app.listen()}`;
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--disable-gpu'] });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let fails = 0;
+import fs from 'node:fs';
+const SHOTS = process.env.SHOTS; if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
+const snap = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name + '.png') }); };
+const check = (name, ok, extra = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  → ' + String(extra).slice(0, 220)}`); if (!ok) fails++; };
+
+async function ctxPage(w, h) {
+  const ctx = await (browser.createBrowserContext ? browser.createBrowserContext() : browser.createIncognitoBrowserContext());
+  const p = await ctx.newPage();
+  await p.setViewport({ width: w, height: h });
+  p.errors = [];
+  p.on('pageerror', (e) => p.errors.push(e.message));
+  p.on('dialog', (d) => d.accept(d.type() === 'prompt' ? d.defaultValue() : undefined).catch(() => {}));
+  return p;
+}
+const text = (p) => p.evaluate(() => document.body.innerText);
+async function waitText(p, re, ms = 8000) {
+  const t0 = Date.now(); let t = '';
+  while (Date.now() - t0 < ms) { t = await text(p); if (re.test(t)) return true; await sleep(120); }
+  waitText.last = t.replace(/\s+/g, ' ').slice(0, 300); return false;
+}
+async function waitFn(p, fn, arg, ms = 8000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) { if (await p.evaluate(fn, arg)) return true; await sleep(120); }
+  return false;
+}
+const tc = (p, sel) => p.click(sel);
+const consoleHook = (p, fn, ...a) => p.evaluate(fn, ...a);
+
+/* simulated audience phones (their own cookies, like real devices) */
+class Phone {
+  constructor() { this.cookie = ''; }
+  async answer(code, q, a) {
+    const r = await fetch(base + '/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json', cookie: this.cookie }, body: JSON.stringify({ code, q, a }) });
+    const sc = r.headers.getSetCookie?.() || []; if (sc.length) this.cookie = sc.map((c) => c.split(';')[0]).join('; ');
+    return r.status;
+  }
+}
+import WebSocket from 'ws';
+const phonesWs = [];
+function joinPhone(code) { return new Promise((res) => { const ws = new WebSocket(base.replace('http', 'ws') + '/ws'); ws.on('open', () => { ws.send(JSON.stringify({ t: 'sub', ch: 'live:' + code })); phonesWs.push(ws); res(ws); }); }); }
+
+/* ---------- set up: tech signs in and creates a survey ---------- */
+app.store.users.upsert('boss', 'admin');
+app.store.users.upsert('ravi@example.org', 'host');
+const tech = await ctxPage(1440, 900);
+await tech.goto(`${base}/?login=${app.auth.createLoginLink('boss').token}&__test=1`, { waitUntil: 'networkidle0' });
+await tech.waitForSelector('.a-tabs', { timeout: 10000 });
+await tech.evaluate(async () => {
+  const { A, loadAll, openSv, orderQs } = window.__console;
+  await Cloud.seedQuestions(window.SEED_QUESTIONS); await loadAll();
+  const pick = (k, n) => A.bank.filter((q) => (q.kind || 'round') === k).slice(0, n);
+  const qs = [...pick('round', 4), ...pick('fast', 5)].map((q) => ({ bankId: q.id, en: q.en, kind: q.kind || 'round', category: q.category || '', title: q.title || '', multiplier: q.multiplier || 1, source: q.source || 'discourse', optional: false, cue: '', answers: q.answers || [] }));
+  const id = await Cloud.createSurvey({ name: 'Camp Show', status: 'draft', questions: orderQs(qs), code: '' });
+  await loadAll(); await openSv(id);
+});
+await tc(tech, '[data-a="launch"]');
+await tech.waitForSelector('[data-a="open0"]', { timeout: 8000 });
+const code = await tech.evaluate(() => window.__console.A.sv.code);
+console.log('survey launched with code', code);
+
+/* ---------- projector laptop: opens the one URL and stays on it ---------- */
+const proj = await ctxPage(1920, 1080);
+await proj.goto(`${base}/display.html?code=${code}`, { waitUntil: 'networkidle0' });
+await sleep(600); await snap(proj, 'p1-projector-lobby');
+check('PROJECTOR lobby: join QR code, code and instructions', await waitText(proj, new RegExp(`Scan to play[\\s\\S]*${code}`)) && await proj.evaluate(() => !!document.querySelector('.qr svg')), waitText.last);
+
+const phones = Array.from({ length: 12 }, () => new Phone());
+for (let i = 0; i < 5; i++) await joinPhone(code);
+check('PROJECTOR lobby: shows how many phones joined (5)', await waitText(proj, /5 phones connected/), waitText.last);
+check('TECH lobby: also shows 5 phones connected', await waitText(tech, /5 phones connected/), waitText.last);
+
+/* ---------- emcee phone ---------- */
+const emcee = await ctxPage(430, 900);
+await emcee.goto(`${base}/emcee.html?login=${app.auth.createLoginLink('ravi@example.org').token}`, { waitUntil: 'networkidle0' });
+check('EMCEE list shows the running survey', await waitText(emcee, /Camp Show[\s\S]*Survey in progress/), waitText.last);
+await emcee.click('[data-a="open"]');
+await sleep(400); await snap(tech, 't1-tech-lobby'); await snap(emcee, 'e1-emcee-waiting');
+check('EMCEE sees "waiting for the first question" and phone count', await waitText(emcee, /Waiting for the first question[\s\S]*Phones connected: 5/), waitText.last);
+
+/* ---------- survey questions ---------- */
+const words = ['Honesty', 'Kindness', 'Love', 'Service', 'Humility'];
+await tc(tech, '[data-a="open0"]');
+check('PROJECTOR question: number, text, countdown', await waitText(proj, /QUESTION 1 OF 9/) && await waitFn(proj, () => /^\d+$/.test((document.getElementById('qt') || {}).textContent || '')), waitText.last);
+const q1 = await tech.evaluate(() => window.__console.items()[0].r.question.en);
+check('PROJECTOR shows the actual question text', (await text(proj)).includes(q1.slice(0, 30)));
+check('EMCEE sees the same question', await waitText(emcee, /QUESTION 1 OF 9/) && (await text(emcee)).includes(q1.slice(0, 30)), waitText.last);
+for (let i = 0; i < 7; i++) await phones[i].answer(code, 0, words[i % 5]);
+check('PROJECTOR live count rises to 7', await waitFn(proj, () => (document.getElementById('qc') || {}).textContent === '7'), await text(proj));
+check('EMCEE live count rises to 7', await waitFn(emcee, () => (document.getElementById('ecount') || {}).textContent === '7'));
+check('TECH live count rises to 7', await waitFn(tech, () => (document.getElementById('r0Count') || {}).textContent === '7'));
+await snap(proj, 'p2-projector-question'); await snap(emcee, 'e2-emcee-question'); await snap(tech, 't2-tech-collecting');
+await tc(tech, '[data-a="close"]');
+check('PROJECTOR "time is up" with the total', await waitText(proj, /Time is up[\s\S]*7 answers received/), waitText.last);
+check('EMCEE "time is up" too', await waitText(emcee, /TIME IS UP[\s\S]*7 answers received/), waitText.last);
+for (let q = 1; q < 9; q++) {
+  await tc(tech, '[data-a="next"]'); await sleep(350);
+  for (let i = 0; i < 12; i++) await phones[i].answer(code, q, words[(i + q) % 5]);
+}
+await sleep(300);
+
+/* ---------- counting, then the gate, then the game ---------- */
+await tc(tech, '[data-a="next"]');                                   // Finish & tabulate
+await tech.waitForSelector('.r0-table', { timeout: 15000 });
+await sleep(300); await snap(proj, 'p3-projector-counting'); await snap(tech, 't3-tech-tabulate');
+check('PROJECTOR "counting the votes" while the tech works', await waitText(proj, /Counting the votes/), waitText.last);
+check('EMCEE told the votes are being counted', await waitText(emcee, /SURVEY COMPLETE[\s\S]*counting the votes/i), waitText.last);
+await tc(tech, '[data-a="apply"]');
+await tech.waitForSelector('[data-a="begin"]', { timeout: 8000 });
+await sleep(300); await snap(proj, 'p4-projector-gate'); await snap(emcee, 'e3-emcee-gate');
+check('PROJECTOR gate: "contestants please come up"', await waitText(proj, /Thank you, audience![\s\S]*Contestants/), waitText.last);
+check('EMCEE told to invite the contestants', await waitText(emcee, /Invite the contestants up/), waitText.last);
+await tc(tech, '[data-a="begin"]');
+check('PROJECTOR switches to the game board by itself', await waitFn(proj, () => document.querySelectorAll('.a').length === 5, null, 10000), await text(proj));
+check('EMCEE follows to the board automatically (hidden answers visible)', await waitFn(emcee, () => document.querySelectorAll('.ans').length === 5, null, 12000), await text(emcee));
+check('TECH sees the hidden answers dimmed with a lock', await tech.evaluate(() => document.querySelectorAll('.answer .peek').length >= 5));
+check('TECH shows the projector panel with a live preview', await tech.evaluate(() => !!document.querySelector('#projPanel .proj-preview iframe') && !document.getElementById('projPanel').classList.contains('hidden')));
+const preview = tech.frames().find((f) => f.url().includes('display.html'));
+check('TECH projector preview is the real projector page showing the board', !!preview && await waitFn(preview, () => document.querySelectorAll('.a').length === 5, null, 8000));
+
+/* ---------- running the board: reveal, strike, award, and take each one back ---------- */
+const onProj = () => proj.evaluate(() => document.querySelectorAll('.a.on').length);
+const strikesProj = () => proj.evaluate(() => document.querySelectorAll('.strikes i.on').length);
+const scoresProj = () => proj.evaluate(() => [...document.querySelectorAll('.team .s')].map((e) => e.textContent));
+const histLen = () => tech.evaluate(() => document.querySelectorAll('.hist li').length);
+await tech.keyboard.press('1'); await tech.keyboard.press('2');
+check('reveal two answers: projector shows 2 tiles', await waitFn(proj, () => document.querySelectorAll('.a.on').length === 2), await onProj());
+check('EMCEE marks 2 answers ON BOARD', await waitFn(emcee, () => document.querySelectorAll('.ans.on').length === 2));
+await sleep(500); await snap(tech, 't4-tech-board'); await snap(proj, 'p5-projector-board'); await snap(emcee, 'e4-emcee-board');
+await tech.keyboard.press('x');
+check('strike: projector shows 1 strike', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 1));
+await tech.keyboard.press('x');
+check('second strike shows (2)', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 2));
+await tech.keyboard.press('z');
+check('UNDO (Z) takes back the second strike everywhere', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 1) && await waitFn(emcee, () => document.querySelectorAll('.strikes i.on').length === 1), await strikesProj());
+await tech.keyboard.down('Shift'); await tech.keyboard.press('z'); await tech.keyboard.up('Shift');
+check('REDO (Shift+Z) puts it back', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 2));
+await tech.click('[data-strike="remove"]');
+check('"Remove a strike" button works', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 1));
+await tech.keyboard.press('2');
+check('clicking a revealed answer again hides it', await waitFn(proj, () => document.querySelectorAll('.a.on').length === 1));
+await tech.keyboard.press('z');
+check('undo brings the hidden answer back', await waitFn(proj, () => document.querySelectorAll('.a.on').length === 2));
+
+await tech.keyboard.press('a');                                        // award to team A (a mistake we then fix)
+await sleep(500); await snap(tech, 't5-tech-awarded-undo-hint');
+check('award: round goes to Team A and the score shows on the projector', await waitFn(proj, () => Number((document.querySelector('.team .s') || {}).textContent) > 0), (await scoresProj()).join(','));
+const scoreAfterAward = (await scoresProj())[0];
+check('award note appears with an undo hint', await waitText(tech, /Wrong team\? Press Undo/), waitText.last);
+check('projector shows who was awarded', await waitText(proj, /Round awarded to/), waitText.last);
+await tech.keyboard.down('Control'); await tech.keyboard.press('z'); await tech.keyboard.up('Control');
+check('Ctrl+Z takes the award back: score returns to 0 on the projector', await waitFn(proj, () => (document.querySelector('.team .s') || {}).textContent === '0'), (await scoresProj()).join(','));
+await tech.keyboard.press('b');
+check('...and it can now be awarded to the right team (B)', await waitFn(proj, () => Number(document.querySelectorAll('.team .s')[1].textContent) > 0 && document.querySelectorAll('.team .s')[0].textContent === '0'), (await scoresProj()).join(','));
+const hist = await histLen();
+check('recent actions are listed for the tech', hist >= 1, hist);
+await tech.click('[data-adj="A:10"]');
+check('score correction +10 for Team A shows on the projector', await waitFn(proj, () => document.querySelectorAll('.team .s')[0].textContent === '10'));
+await tech.keyboard.press('z');
+check('...and it can be undone too', await waitFn(proj, () => document.querySelectorAll('.team .s')[0].textContent === '0'));
+
+/* steal banner after three strikes (next round) */
+await tech.click('[data-next="1"]');
+await tech.keyboard.press('x'); await tech.keyboard.press('x'); await tech.keyboard.press('x');
+await sleep(400); await snap(tech, 't6-tech-steal'); await snap(proj, 'p6-projector-steal');
+check('three strikes: tech board shows the STEAL instructions', await waitText(tech, /STEAL![\s\S]*gets one guess/), waitText.last);
+check('three strikes: projector shows the STEAL banner', await waitText(proj, /STEAL —/), waitText.last);
+await tech.keyboard.press('z');
+check('undo removes the steal state', await waitFn(tech, () => !document.querySelector('.steal-banner')));
+await tech.click('[data-prev="1"]');
+check('Back button returns to round 1', await waitText(tech, /ROUND 1/), waitText.last);
+
+/* ---------- projector override ---------- */
+await tech.select('#projPanel [data-proj]', 'intermission');
+await sleep(500); await snap(proj, 'p7-projector-intermission');
+check('PROJECTOR override: intermission screen', await waitText(proj, /We will be right back/), waitText.last);
+await tech.select('#projPanel [data-proj]', 'blank');
+check('PROJECTOR override: blank screen', await waitFn(proj, () => document.getElementById('app').innerHTML.trim() === ''));
+await tech.select('#projPanel [data-proj]', '');
+check('PROJECTOR back to the game automatically', await waitFn(proj, () => document.querySelectorAll('.a').length === 5));
+
+/* ---------- audience phone page still works alongside ---------- */
+const aud = await ctxPage(390, 800);
+await aud.goto(`${base}/play.html?code=${code}`, { waitUntil: 'networkidle0' });
+check('AUDIENCE phone shows the thank-you page with live scores', await waitText(aud, /Thank you[\s\S]*LIVE SCORES/i), waitText.last);
+
+const allErrors = [tech, proj, emcee, aud].flatMap((p, i) => p.errors.map((e) => ['tech', 'projector', 'emcee', 'audience'][i] + ': ' + e));
+check('no JavaScript errors on any of the four screens', allErrors.length === 0, allErrors.join(' | '));
+
+phonesWs.forEach((w) => w.close());
+await browser.close(); await app.close();
+console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
+process.exit(fails ? 1 : 0);
