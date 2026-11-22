@@ -89,8 +89,13 @@ button{font:inherit;font-weight:700;border:0;border-radius:var(--r);background:v
 .conn{position:fixed;top:1.2vh;right:1.2vw;background:rgba(180,50,44,.85);color:#fff;font-size:13px;font-weight:700;padding:5px 12px;border-radius:999px;z-index:20}
 body.idle{cursor:none}
 @media(max-width:800px){.lobby{grid-template-columns:1fr}}
+
+/* ----- sound prompt ----- */
+.snd{position:fixed;left:50%;bottom:12vh;transform:translateX(-50%);z-index:30;font:700 clamp(16px,1.8vw,28px) var(--font);padding:1.4vh 2.4vw;border:0;border-radius:999px;background:var(--orange);color:var(--navy);box-shadow:var(--shadow-lg);cursor:pointer;animation:sndpulse 1.8s ease-in-out infinite}
+@keyframes sndpulse{50%{box-shadow:0 0 0 14px rgba(230,126,23,.25)}}
+.snd.on{left:1.2vw;top:1.2vh;bottom:auto;transform:none;font-size:12px;font-weight:600;padding:5px 12px;background:rgba(255,255,255,.12);color:#cfe0e8;box-shadow:none;animation:none;cursor:default;opacity:.7}
 </style>
-<script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script><script src="qr.js"></script>
+<script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script><script src="qr.js"></script><script src="sound.js"></script>
 <script>/* games.js - the game registry shared by the host console (index), the emcee view and the projector display.
    Every game is a plug-in with the SAME contract:
      id, label, icon, itemLabel, fields[], kinds[], defaults
@@ -365,12 +370,13 @@ G.register({
 <span class="sssio-logo corner" role="img" aria-label="SSSIO"></span>
 <div id="fx"></div>
 <div id="conn" class="conn hidden" role="status">Reconnecting…</div>
+<button id="snd" class="snd" type="button">🔊 Click here once to turn the sound on</button>
 <script>
 'use strict';
 var FB='https://www.gstatic.com/firebasejs/10.12.2/';
 var app=document.getElementById('app'),fxEl=document.getElementById('fx');
 var code=(new URLSearchParams(location.search).get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-var D=null,L=null,ST=null,offset=0,prevStrikes=0,prevKey='',timerT=null,qT=null;
+var D=null,L=null,ST=null,offset=0,prevStrikes=0,prevKey='',timerT=null,qT=null,lastScreen=null,lastCue=null,cueSeen=false,tickAt=-1,gTick=-1;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 
 function askCode(){app.innerHTML='<div class="wait"><h1>Scoreboard</h1><p>Enter the game code</p><input id="c" maxlength="5" autocomplete="off"><button id="g">Open</button></div>';
@@ -398,7 +404,7 @@ function drawGame(){
       (r.awarded?'<div class="ok">Round awarded to '+esc(t[r.awarded.team].name)+' (+'+r.awarded.points+')</div>':'');
   }
   app.innerHTML=h;
-  clearInterval(timerT);if(D.timerRunning)timerT=setInterval(function(){var e=document.getElementById('tm'),l=timeLeft();if(e){e.textContent=String(l).padStart(2,'0')+'s';e.className='timer'+(l<=5?' u':'')}},500)}
+  clearInterval(timerT);if(D.timerRunning)timerT=setInterval(function(){var e=document.getElementById('tm'),l=timeLeft();if(e){e.textContent=String(l).padStart(2,'0')+'s';e.className='timer'+(l<=5?' u':'')}if(l>5)gTick=-1;else if(l>0&&l!==gTick){gTick=l;snd('tick')}},500)}
 /* ---------- every stage of the show on one continuous screen ---------- */
 function joinUrl(){var u=new URL('play.html',location.href);u.search='?code='+code;u.hash='';return u.toString()}
 function shortUrl(){return joinUrl().replace(/^https?:\/\//,'').replace(/\?.*$/,'')}
@@ -428,18 +434,51 @@ function drawStage(n){
   else if(n==='gate')h=centered(logo+'<h1 class="big">Thank you, audience!</h1><p class="sub">Contestants, please come up. The game is about to begin.</p>');
   else if(n==='thanks')h=centered(logo+'<h1 class="big">Thank you!</h1><p class="sub">The game begins shortly.</p>');
   app.innerHTML=h;
-  if(n==='question')qT=setInterval(function(){var e=document.getElementById('qt');if(e){var l=qLeft();e.textContent=l;e.className='qtime'+(l<=10?' u':'')}},300)}
-function draw(){var n=pick();clearInterval(timerT);clearInterval(qT);if(n==='game'){drawGame();return}drawStage(n)}
-function onLive(d){L=d;if(d&&d.hostNow)offset=d.hostNow-Date.now();draw()}
+  if(n==='question')qT=setInterval(function(){var e=document.getElementById('qt');if(e){var l=qLeft();e.textContent=l;e.className='qtime'+(l<=10?' u':'');if(l>5)tickAt=-1;else if(l>0&&l!==tickAt){tickAt=l;snd('tick')}}},300)}
+function draw(){var n=pick();clearInterval(timerT);clearInterval(qT);
+  if(n==='game'&&['lobby','question','closed','tabulating','gate','thanks'].indexOf(lastScreen)>=0)snd('intro');
+  lastScreen=n;if(n==='game'){drawGame();return}drawStage(n)}
+function onLive(d){soundForLive(L,d);L=d;if(d&&d.hostNow)offset=d.hostNow-Date.now();draw()}
 function onStats(s){ST=s;var c=document.getElementById('qc'),v=document.getElementById('dev');
   if(c&&s&&L&&s.q===L.q)c.textContent=s.count;if(v&&s)v.textContent=s.devices;
   if(!c&&!v&&s&&(pick()==='lobby'||pick()==='question'||pick()==='closed'))draw()}
+/* ---------- sound: the hall speakers are on THIS laptop, so every sound is played here ---------- */
+function snd(n){try{if(window.Sound)Sound.play(n)}catch(e){}}
+function nOn(r){return r.answers.filter(function(a){return a.on}).length}
+function soundForDoc(p,d){
+  if(!d)return;var pr=p&&p.round,nr=d.round;
+  if(nr&&pr&&pr.n===nr.n){
+    if(nOn(nr)>nOn(pr))snd('ding');
+    if(nr.strikes>pr.strikes)snd('buzzer');
+    if(nr.awarded&&!pr.awarded){snd('fanfare');setTimeout(function(){snd('applause')},250)}
+    if(nr.steal&&!pr.steal)snd('steal')
+  }else if(nr&&pr)snd('sting');
+  if(p&&d.view==='fast'&&p.view!=='fast')snd('fastmoney');
+  if(p&&p.fast&&d.fast){
+    if(d.fast.reveal&&!p.fast.reveal)snd('ding');
+    if(d.fast.awarded&&!p.fast.awarded){snd('fanfare');setTimeout(function(){snd('applause')},250)}}
+  if(p&&p.timerRunning&&!d.timerRunning&&d.timerSeconds===0)snd('timeup')}
+function soundForLive(p,d){
+  if(!d)return;
+  if(p&&d.mode!=='buzzer'){
+    if(d.phase==='open'&&(p.phase!=='open'||p.q!==d.q))snd('sting');
+    if(p.phase==='open'&&d.phase==='closed'&&p.q===d.q)snd('timeup')}
+  if(d.snd&&window.Sound){Sound.setMuted(!!d.snd.mute);if(typeof d.snd.vol==='number')Sound.setVolume(d.snd.vol)}
+  // a cue from the tech's soundboard (cues already in the document when this page opens are not replayed)
+  if(!cueSeen){cueSeen=true;lastCue=d.cue&&d.cue.id}
+  else if(d.cue&&d.cue.id!==lastCue){lastCue=d.cue.id;if(d.cue.name==='stop'){if(window.Sound)Sound.stop()}else snd(d.cue.name)}}
 /* keep the screen on, full screen on F / double-click, hide the mouse, show a quiet dot if the connection drops */
 function kiosk(){
   var wl=function(){try{if(navigator.wakeLock)navigator.wakeLock.request('screen').catch(function(){})}catch(e){}};wl();
   document.addEventListener('visibilitychange',function(){if(!document.hidden)wl()});
   var fs=function(){try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen()}catch(e){}};
   document.addEventListener('keydown',function(e){if(e.key==='f'||e.key==='F')fs()});document.addEventListener('dblclick',fs);
+  var sb=document.getElementById('snd');
+  function showSnd(){var s=window.Sound?Sound.state():null;if(!s||!sb)return;
+    if(!s.unlocked){sb.className='snd';sb.textContent='🔊 Click here once to turn the sound on';return}
+    sb.className='snd on';sb.textContent=s.mute?'🔇 Sound is muted from the tech laptop':'🔊 Sound on'+(s.files.length?' · your files: '+s.files.join(', '):'')}
+  function unlockSound(){if(!window.Sound)return;var first=!Sound.state().unlocked;Sound.unlock();if(first){Sound.loadFiles('sounds/');snd('ding')}showSnd()}
+  if(window.Sound){Sound.onState(showSnd);['pointerdown','keydown'].forEach(function(ev){document.addEventListener(ev,unlockSound)})}
   var hint=document.createElement('div');hint.className='hint';hint.textContent='Press F for full screen';document.body.appendChild(hint);
   var mt=null,idle=function(){document.body.classList.add('idle')};mt=setTimeout(idle,3000);
   document.addEventListener('mousemove',function(){document.body.classList.remove('idle');clearTimeout(mt);mt=setTimeout(idle,3000)});
@@ -447,7 +486,7 @@ function kiosk(){
 function onDoc(d){
   var key=d&&d.round?'r'+d.round.n:(d&&d.view);
   if(d&&d.round&&key===prevKey&&d.round.strikes>prevStrikes){fxEl.innerHTML='<div class="fx">'+new Array(Math.max(1,d.round.strikes)+1).join('<span>✕</span>')+'</div>';setTimeout(function(){fxEl.innerHTML=''},1150)}
-  prevKey=key;prevStrikes=d&&d.round?d.round.strikes:0;D=d;draw()}
+  prevKey=key;prevStrikes=d&&d.round?d.round.strikes:0;soundForDoc(D,d);D=d;draw()}
 
 async function firebaseBackend(){
   var cfg=window.FIREBASE_CONFIG;if(!cfg||!cfg.apiKey||/PASTE|YOUR/i.test(cfg.apiKey))throw new Error('This site is not configured yet (firebase-config.js).');

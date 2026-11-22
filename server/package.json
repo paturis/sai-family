@@ -14,7 +14,8 @@
     "loadtest": "node loadtest/phones.js",
     "e2e": "node --disable-warning=ExperimentalWarning test/e2e/browser.mjs",
     "shots": "node --disable-warning=ExperimentalWarning test/e2e/shots.mjs",
-    "e2e:views": "node --disable-warning=ExperimentalWarning test/e2e/views.mjs"
+    "e2e:views": "node --disable-warning=ExperimentalWarning test/e2e/views.mjs",
+    "e2e:sounds": "node --disable-warning=ExperimentalWarning test/e2e/sounds.mjs"
   },
   "dependencies": {
     "nodemailer": "^10.6.1",

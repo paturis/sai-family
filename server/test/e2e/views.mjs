@@ -77,6 +77,14 @@ console.log('survey launched with code', code);
 /* ---------- projector laptop: opens the one URL and stays on it ---------- */
 const proj = await ctxPage(1920, 1080);
 await proj.goto(`${base}/display.html?code=${code}`, { waitUntil: 'networkidle0' });
+const installRecorder = () => proj.evaluate(() => { window.__played = []; const o = Sound.play; Sound.play = function (n) { const r = o.apply(this, arguments); window.__played.push([n, r]); return r; }; });
+const played = () => proj.evaluate(() => window.__played.map((x) => x[0]));
+const count = (n) => proj.evaluate((n) => window.__played.filter((x) => x[0] === n).length, n);
+await installRecorder();
+check('PROJECTOR asks for one click to turn the sound on', await waitText(proj, /Click here once to turn the sound on/), waitText.last);
+await proj.click('#snd');                                  // the person at the projector laptop clicks once
+check('PROJECTOR sound is on after that one click (and says so)', await waitText(proj, /Sound on/) && await proj.evaluate(() => Sound.state().unlocked), waitText.last);
+check('PROJECTOR confirmed with a test ding that really played', (await proj.evaluate(() => window.__played.filter((x) => x[0] === 'ding' && x[1] === true).length)) === 1);
 await sleep(600); await snap(proj, 'p1-projector-lobby');
 check('PROJECTOR lobby: join QR code, code and instructions', await waitText(proj, new RegExp(`Scan to play[\\s\\S]*${code}`)) && await proj.evaluate(() => !!document.querySelector('.qr svg')), waitText.last);
 
@@ -99,6 +107,7 @@ await tc(tech, '[data-a="open0"]');
 check('PROJECTOR question: number, text, countdown', await waitText(proj, /QUESTION 1 OF 9/) && await waitFn(proj, () => /^\d+$/.test((document.getElementById('qt') || {}).textContent || '')), waitText.last);
 const q1 = await tech.evaluate(() => window.__console.items()[0].r.question.en);
 check('PROJECTOR shows the actual question text', (await text(proj)).includes(q1.slice(0, 30)));
+check('PROJECTOR played the question chime', (await played()).includes('sting'));
 check('EMCEE sees the same question', await waitText(emcee, /QUESTION 1 OF 9/) && (await text(emcee)).includes(q1.slice(0, 30)), waitText.last);
 for (let i = 0; i < 7; i++) await phones[i].answer(code, 0, words[i % 5]);
 check('PROJECTOR live count rises to 7', await waitFn(proj, () => (document.getElementById('qc') || {}).textContent === '7'), await text(proj));
@@ -107,6 +116,7 @@ check('TECH live count rises to 7', await waitFn(tech, () => (document.getElemen
 await snap(proj, 'p2-projector-question'); await snap(emcee, 'e2-emcee-question'); await snap(tech, 't2-tech-collecting');
 await tc(tech, '[data-a="close"]');
 check('PROJECTOR "time is up" with the total', await waitText(proj, /Time is up[\s\S]*7 answers received/), waitText.last);
+check('PROJECTOR played the time-up buzzer', (await played()).includes('timeup'));
 check('EMCEE "time is up" too', await waitText(emcee, /TIME IS UP[\s\S]*7 answers received/), waitText.last);
 for (let q = 1; q < 9; q++) {
   await tc(tech, '[data-a="next"]'); await sleep(350);
@@ -127,6 +137,7 @@ check('PROJECTOR gate: "contestants please come up"', await waitText(proj, /Than
 check('EMCEE told to invite the contestants', await waitText(emcee, /Invite the contestants up/), waitText.last);
 await tc(tech, '[data-a="begin"]');
 check('PROJECTOR switches to the game board by itself', await waitFn(proj, () => document.querySelectorAll('.a').length === 5, null, 10000), await text(proj));
+check('PROJECTOR played the intro music when the game began', (await played()).includes('intro'));
 check('EMCEE follows to the board automatically (hidden answers visible)', await waitFn(emcee, () => document.querySelectorAll('.ans').length === 5, null, 12000), await text(emcee));
 check('TECH sees the hidden answers dimmed with a lock', await tech.evaluate(() => document.querySelectorAll('.answer .peek').length >= 5));
 check('TECH shows the projector panel with a live preview', await tech.evaluate(() => !!document.querySelector('#projPanel .proj-preview iframe') && !document.getElementById('projPanel').classList.contains('hidden')));
@@ -138,16 +149,24 @@ const onProj = () => proj.evaluate(() => document.querySelectorAll('.a.on').leng
 const strikesProj = () => proj.evaluate(() => document.querySelectorAll('.strikes i.on').length);
 const scoresProj = () => proj.evaluate(() => [...document.querySelectorAll('.team .s')].map((e) => e.textContent));
 const histLen = () => tech.evaluate(() => document.querySelectorAll('.hist li').length);
-await tech.keyboard.press('1'); await tech.keyboard.press('2');
+const d1 = await count('ding');
+await tech.keyboard.press('1'); await sleep(700); await tech.keyboard.press('2');
 check('reveal two answers: projector shows 2 tiles', await waitFn(proj, () => document.querySelectorAll('.a.on').length === 2), await onProj());
+check('PROJECTOR played a ding for each reveal', await waitFn(proj, (n) => window.__played.filter((x) => x[0] === 'ding').length === n, d1 + 2), await count('ding'));
 check('EMCEE marks 2 answers ON BOARD', await waitFn(emcee, () => document.querySelectorAll('.ans.on').length === 2));
 await sleep(500); await snap(tech, 't4-tech-board'); await snap(proj, 'p5-projector-board'); await snap(emcee, 'e4-emcee-board');
+const bz0 = await count('buzzer');
 await tech.keyboard.press('x');
 check('strike: projector shows 1 strike', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 1));
+check('PROJECTOR sounded the buzzer for the strike', await waitFn(proj, (n) => window.__played.filter((x) => x[0] === 'buzzer').length === n, bz0 + 1), await count('buzzer'));
 await tech.keyboard.press('x');
 check('second strike shows (2)', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 2));
+await sleep(300);
+const bzUndo = await count('buzzer');
 await tech.keyboard.press('z');
 check('UNDO (Z) takes back the second strike everywhere', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 1) && await waitFn(emcee, () => document.querySelectorAll('.strikes i.on').length === 1), await strikesProj());
+await sleep(500);
+check('undoing a strike does NOT sound the buzzer', (await count('buzzer')) === bzUndo, await count('buzzer'));
 await tech.keyboard.down('Shift'); await tech.keyboard.press('z'); await tech.keyboard.up('Shift');
 check('REDO (Shift+Z) puts it back', await waitFn(proj, () => document.querySelectorAll('.strikes i.on').length === 2));
 await tech.click('[data-strike="remove"]');
@@ -157,11 +176,13 @@ check('clicking a revealed answer again hides it', await waitFn(proj, () => docu
 await tech.keyboard.press('z');
 check('undo brings the hidden answer back', await waitFn(proj, () => document.querySelectorAll('.a.on').length === 2));
 
+const fan0 = await count('fanfare'), app0 = await count('applause');
 await tech.keyboard.press('a');                                        // award to team A (a mistake we then fix)
 await sleep(500); await snap(tech, 't5-tech-awarded-undo-hint');
 check('award: round goes to Team A and the score shows on the projector', await waitFn(proj, () => Number((document.querySelector('.team .s') || {}).textContent) > 0), (await scoresProj()).join(','));
 const scoreAfterAward = (await scoresProj())[0];
 check('award note appears with an undo hint', await waitText(tech, /Wrong team\? Press Undo/), waitText.last);
+check('PROJECTOR played the fanfare and the applause', await waitFn(proj, (a) => window.__played.filter((x) => x[0] === 'fanfare').length === a[0] + 1 && window.__played.filter((x) => x[0] === 'applause').length === a[1] + 1, [fan0, app0]), `${await count('fanfare')}/${await count('applause')}`);
 check('projector shows who was awarded', await waitText(proj, /Round awarded to/), waitText.last);
 await tech.keyboard.down('Control'); await tech.keyboard.press('z'); await tech.keyboard.up('Control');
 check('Ctrl+Z takes the award back: score returns to 0 on the projector', await waitFn(proj, () => (document.querySelector('.team .s') || {}).textContent === '0'), (await scoresProj()).join(','));
@@ -184,6 +205,19 @@ await tech.keyboard.press('z');
 check('undo removes the steal state', await waitFn(tech, () => !document.querySelector('.steal-banner')));
 await tech.click('[data-prev="1"]');
 check('Back button returns to round 1', await waitText(tech, /ROUND 1/), waitText.last);
+
+/* ---------- sound: the tech triggers, the PROJECTOR laptop plays ---------- */
+check('TECH laptop stays silent (the projector is the one on the hall speakers)', await tech.evaluate(() => window.PROJECTOR_PLAYS === true));
+const dr0 = await count('drumroll');
+await tech.click('[data-cue="drumroll"]');
+check('TECH soundboard: the PROJECTOR plays the drum roll', await waitFn(proj, (n) => window.__played.filter((x) => x[0] === 'drumroll' && x[1] === true).length === n, dr0 + 1), await count('drumroll'));
+await tech.click('[data-snd-on]');
+check('TECH sound switch mutes the projector', await waitFn(proj, () => Sound.state().mute === true) && await waitText(proj, /muted from the tech laptop/), waitText.last);
+await tech.click('[data-snd-on]');
+check('...and turns it back on', await waitFn(proj, () => Sound.state().mute === false));
+await proj.reload({ waitUntil: 'networkidle0' });
+await installRecorder(); await proj.click('#snd'); await sleep(900);
+check('a reloaded projector does not replay old soundboard cues', !(await played()).includes('drumroll'), await played());
 
 /* ---------- projector override ---------- */
 await tech.select('#projPanel [data-proj]', 'intermission');

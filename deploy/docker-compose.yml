@@ -15,6 +15,7 @@ services:
     env_file: .env
     volumes:
       - gameshow-data:/data          # the database, backups and the session secret
+      # - ../sounds:/app/web/sounds:ro   # optional: use your own sound files without rebuilding (see sounds/README.txt)
     # --- keep it small and contained on a shared server ---
     read_only: true
     tmpfs: [/tmp]

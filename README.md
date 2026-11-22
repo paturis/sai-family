@@ -60,6 +60,11 @@ server-side AI grouping with the Gemini key kept on the server, and personal log
 See [`deploy/README.md`](deploy/README.md). The pages choose their backend from `backend-config.js`
 (`firebase` on GitHub Pages, `server` when served by the container), so the original setup keeps working.
 
+## Sound
+The projector laptop (on the hall speakers) plays every sound: ding, buzzer, fanfare, applause, countdown ticks, steal alert, intro music.
+The tech has a soundboard and volume control. Sounds are original and generated in the browser; put your own files in `sounds/` to
+replace any of them (see `sounds/README.txt`). Details in `deploy/README.md`.
+
 ## Look and feel
 The design follows sathyasai.org: white and airy staff screens, dark navy panels for what the hall sees, orange and blue brand
 colours, Open Sans text and Rokkitt slab headings (both self-hosted in `fonts/`, so no internet is needed).

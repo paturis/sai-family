@@ -355,3 +355,11 @@ body.presentation .side{display:none}
 .joined-line{font:600 22px var(--font);color:var(--teal-on-dark);margin:6px 0 0}
 .panel .viewas{display:flex;margin:0 0 10px;padding:0}
 .panel .viewas select{flex:1}
+
+/* soundboard */
+.snd-box{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.snd-row{display:flex;align-items:center;gap:12px;margin:6px 0 10px}
+.snd-row input[type=range]{flex:1;accent-color:var(--orange)}
+.snd-row .chk{display:flex;align-items:center;gap:6px;margin:0;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap}
+.soundboard{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.soundboard .btn{justify-content:flex-start}

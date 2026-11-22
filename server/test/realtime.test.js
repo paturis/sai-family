@@ -176,6 +176,11 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
   fs.mkdirSync(path.join(dir, 'fonts'));
   fs.writeFileSync(path.join(dir, 'fonts', 'x.woff2'), 'FONT');
   fs.writeFileSync(path.join(dir, 'fonts', 'notes.txt'), 'no');
+  fs.mkdirSync(path.join(dir, 'sounds'));
+  fs.writeFileSync(path.join(dir, 'sounds', 'buzzer.mp3'), 'MP3DATA');
+  fs.writeFileSync(path.join(dir, 'sounds', 'intro.wav'), Buffer.alloc(3 * 1024 * 1024, 7));
+  fs.writeFileSync(path.join(dir, 'sounds', 'Bad Name.mp3'), 'x');
+  fs.writeFileSync(path.join(dir, 'sounds', 'notes.txt'), 'x');
   const s = await startApp({ webRoot: dir });
   try {
     const get = async (p) => fetch(s.base + p);
@@ -207,6 +212,21 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
     assert.equal((await get('/fonts/../index.html')).status, 200, 'normalised by the client to /index.html');
     assert.equal((await get('/fonts/%2e%2e/secret.html')).status, 404);
     assert.equal((await get('/fonts/..%2fplay.html')).status, 404);
+
+    // your own sound files: small ones cached, big ones streamed, only audio is served, and the projector can ask what is installed
+    const mp3 = await get('/sounds/buzzer.mp3');
+    assert.equal(mp3.status, 200);
+    assert.equal(mp3.headers.get('content-type'), 'audio/mpeg');
+    assert.equal(await mp3.text(), 'MP3DATA');
+    const big = await get('/sounds/intro.wav');
+    assert.equal(big.headers.get('content-type'), 'audio/wav');
+    assert.equal(big.headers.get('content-length'), String(3 * 1024 * 1024));
+    assert.equal((await big.arrayBuffer()).byteLength, 3 * 1024 * 1024, 'a 3 MB file arrives whole, streamed');
+    assert.equal((await fetch(s.base + '/sounds/intro.wav', { method: 'HEAD' })).status, 200);
+    assert.equal((await get('/sounds/notes.txt')).status, 404);
+    assert.deepEqual((await (await get('/sounds/index.json')).json()).files, ['buzzer.mp3', 'intro.wav'], 'lists only well-named audio files');
+    assert.equal((await get('/sounds/..%2findex.html')).status, 404);
+    assert.equal((await get('/sounds/%2e%2e%2findex.html')).status, 404);
 
     // odd paths must not crash the server
     assert.equal((await get('//')).status, 200, 'double slash is just the home page');

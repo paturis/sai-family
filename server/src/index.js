@@ -25,9 +25,15 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+  '.m4a': 'audio/mp4',
 };
 // Only these file names are served from the web folder (no dotfiles, no rules/config of other stacks).
-const STATIC_OK = /^(?:fonts\/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(html|js|css|png|svg|ico|woff2)$/;
+const STATIC_OK = /^(?:(?:fonts|sounds)\/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(html|js|css|png|svg|ico|woff2|mp3|ogg|wav|m4a)$/;
+const SOUND_FILE = /^[a-z0-9_-]+\.(mp3|ogg|wav|m4a)$/;
+const BIG_FILE = 2 * 1024 * 1024; // larger files (music) are streamed, not kept in memory
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
@@ -184,13 +190,20 @@ export async function createApp(overrides = {}) {
     let st;
     try { st = fs.statSync(file); } catch { throw new HttpError(404, 'not_found', 'Not found'); }
     if (!st.isFile()) throw new HttpError(404, 'not_found', 'Not found');
+    const type = MIME[path.extname(name)] || 'application/octet-stream';
+    if (st.size > BIG_FILE) {
+      const h = { 'Content-Type': type, 'Content-Length': st.size, 'Cache-Control': 'public, max-age=3600', ...SECURITY_HEADERS };
+      res.writeHead(200, h);
+      if (req.method === 'HEAD') return res.end();
+      return fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
+    }
     let c = fileCache.get(file);
     if (!c || c.mtime !== st.mtimeMs) {
       const buf = fs.readFileSync(file);
       c = { mtime: st.mtimeMs, buf, etag: `"${crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16)}"` };
       fileCache.set(file, c);
     }
-    const headers = { 'Content-Type': MIME[path.extname(name)] || 'application/octet-stream', 'Cache-Control': name.endsWith('.woff2') ? 'public, max-age=604800' : 'no-cache', ETag: c.etag, ...SECURITY_HEADERS };
+    const headers = { 'Content-Type': MIME[path.extname(name)] || 'application/octet-stream', 'Cache-Control': name.endsWith('.woff2') ? 'public, max-age=604800' : name.startsWith('sounds/') ? 'public, max-age=3600' : 'no-cache', ETag: c.etag, ...SECURITY_HEADERS };
     if (req.headers['if-none-match'] === c.etag) { res.writeHead(304, headers); return res.end(); }
     res.writeHead(200, { ...headers, 'Content-Length': c.buf.length });
     res.end(req.method === 'HEAD' ? undefined : c.buf);
@@ -204,6 +217,11 @@ export async function createApp(overrides = {}) {
         return json(res, 200, { ok: true, uptime: Math.floor(process.uptime()), sockets: wss.clients.size });
       }
       if (p.startsWith('/api/')) return await api(req, res, p);
+      if (p === '/sounds/index.json') { // which of your own sound files are installed (the projector asks once)
+        let files = [];
+        try { files = fs.readdirSync(path.join(config.webRoot, 'sounds')).filter((f) => SOUND_FILE.test(f)).sort(); } catch { /* no folder */ }
+        return json(res, 200, { files });
+      }
       if (p === '/backend-config.js') return send(res, 200, 'window.BACKEND="server";', { 'Content-Type': MIME['.js'] });
       return serveStatic(req, res, p);
     } catch (e) {

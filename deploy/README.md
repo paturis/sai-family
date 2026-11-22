@@ -69,6 +69,21 @@ Each person has their own screen, and each screen has one job. The **Links** but
    to the board by itself when the game starts, showing the hidden answers, strikes and scores. Read-only.
 4. **Audience phones** — the QR code. One short answer per question, then live scores.
 
+### Sound (all played by the projector laptop)
+The hall speakers go on the **projector laptop**, so that is the laptop that plays every sound; the tech laptop stays silent while a
+projector is connected. On the projector page click **"Click here once to turn the sound on"** (browsers require one click) and
+you will hear a test ding. After that it is automatic: a ding for each revealed answer, a buzzer for a strike, a fanfare and applause
+when a round is awarded, a chime when a survey question opens, ticks in the last 5 seconds of any countdown, a buzzer when time runs
+out, a steal alert, and an intro jingle when the game begins. Undoing something never makes a sound.
+
+The tech has a **soundboard** in the Projector panel (ding, buzzer, applause, drum roll, fanfare, intro music, looping "thinking"
+music, stop) with a volume slider and a sound on/off switch. They only send a cue; the projector laptop plays it.
+
+All sounds are original and made in the browser, so nothing needs downloading. To use **your own sounds or music** put files such as
+`buzzer.mp3` or `intro.mp3` in the `sounds/` folder (names and formats in `sounds/README.txt`), rebuild or bind-mount it (see the
+comment in `docker-compose.yml`), and reload the projector page. Only use audio you have the right to use: recordings from TV
+game shows are copyrighted.
+
 ### Taking mistakes back (tech)
 Everything the tech does on the board can be undone: reveals, hides, strikes, who has control, awarding a round (even to the wrong
 team), score corrections and Fast Money. **Z** or **Ctrl/⌘+Z** undoes the last action, **Shift+Z** redoes it, and the sidebar shows the
@@ -88,7 +103,7 @@ last action plus a list of recent ones. **X** adds a strike and **Shift+X** remo
   docker compose exec app node src/cli.js remove-user loadtest
   ```
   Expect `PASS`. Run it while your other services are busy to see the real picture on a shared VPS.
-- **All four screens, automated:** `cd server && npm run e2e:views` runs a whole show (tech, projector, emcee, audience) in real browsers and checks every stage and every undo.
+- **All four screens, automated:** `cd server && npm run e2e:views` runs a whole show (tech, projector, emcee, audience) in real browsers and checks every stage, every undo and that the projector plays each sound at the right moment. `npm run e2e:sounds` checks that every built-in sound is audible, not clipped and the right length (set `SOUNDS_OUT=/folder` to also save WAV files to listen to).
 - **Real phones:** 10+ people on the venue wifi (or mobile data), full 45-minute run with a stopwatch.
 
 ## Day to day
