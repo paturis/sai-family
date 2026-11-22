@@ -11,30 +11,33 @@ phones / projector / tech laptop  ──https──►  your Caddy  ──►  s
 ## First-time setup (about 10 minutes)
 
 1. **DNS:** point a name (e.g. `game.example.org`) at the VPS.
-2. **Get the code** on the VPS (`git clone`, branch `self-hosted`) and go to `deploy/`.
+2. **Get the code** on the VPS and go to `deploy/`:
+   ```bash
+   git clone -b self-hosted git@github.com:paturis/sai-family.git && cd sai-family/deploy
+   ```
 3. **Settings:**
    ```bash
    cp .env.example .env && chmod 600 .env
-   nano .env        # PUBLIC_URL, GEMINI_API_KEY, ADMIN_IDS, CADDY_NETWORK
+   nano .env        # at least PUBLIC_URL (https), ADMIN_IDS and GEMINI_API_KEY
    ```
-   `docker network ls` shows the network your Caddy container is on; put its name in `CADDY_NETWORK`.
 4. **Start it:**
    ```bash
    docker compose up -d --build
-   docker compose logs -f app     # expect:  [server] listening …   and   [ai] self-test: ready (gemini-3.5-flash-lite, … ms)
+   docker compose logs -f app     # expect:  [server] listening …   and   [ai] self-test: ready (…)
    ```
-5. **Caddy:** add the block from `Caddyfile.example` to the Caddyfile you already run and reload it
-   (`docker exec <caddy> caddy reload --config /etc/caddy/Caddyfile`). Caddy gets the HTTPS certificate by itself.
-   If Caddy runs directly on the host instead of in Docker, see the comment in `docker-compose.yml` (publish `127.0.0.1:8080`).
+5. **Expose it through your Caddy.** The app listens on port 8080 inside its container and serves everything (pages, API and the
+   `/ws` WebSocket; Caddy's `reverse_proxy` handles WebSockets by default). Add whatever your setup needs to the `app` service in
+   `docker-compose.yml` (labels, a network, or a published port: examples are at the bottom of the file), then `docker compose up -d`.
+   The address you expose must match `PUBLIC_URL` in `.env`.
 6. **Your login link:**
    ```bash
-   docker compose exec app node src/cli.js login-link ritesh
+   docker compose exec app node src/cli.js login-link <the name in ADMIN_IDS>
    ```
    Open the printed link: you are signed in as admin for 30 days on that browser.
 7. **Add the team** in the app (Team tab). Use people's **email addresses**: with email set up (below) the app emails them a
    sign-in link straight away; otherwise it shows the link to copy and send yourself (WhatsApp is fine).
    Every link works **once**. You can also do it on the server: `docker compose exec app node src/cli.js add-user ravi@example.org tech`.
-8. **Load the question bank:** Dashboard → Question bank → add the starter questions (same as before).
+8. **Load the question bank:** Dashboard → Question bank → add the starter questions.
 
 ## Email sign-in (Microsoft 365)
 
@@ -51,9 +54,6 @@ revocable the moment you remove someone, which a self-contained signed token cou
    (and use an app password if MFA is on), or switch to a different mailbox/provider. Until it works, everything else still does:
    admins can copy login links from the Team tab or the CLI.
 4. The sender must be the mailbox itself (or one it has "Send as" rights for), set with `SMTP_FROM`.
-
-Roles: **admin** does everything, **tech** runs the show (no bank edits, no creating or deleting surveys), **host** is the
-read-only emcee screen (`/emcee.html`).
 
 ## The four screens on the day
 
