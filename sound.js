@@ -148,7 +148,7 @@
       tone(c, o, t, hz('A3'), 0.32, 'sawtooth', 0.3, { lp: 1800 });
       tone(c, o, t, hz('A3') * 1.5, 0.32, 'square', 0.14, { lp: 1800 });
       noise(c, o, t, 0.05, 0.25, { freq: 3000, q: 0.8 });
-      tone(c, o, t + 0.2, hz('E6'), 0.7, 'sine', 0.22, { release: 0.4 });
+      tone(c, o, t + 0.2, hz('E6'), 1.0, 'sine', 0.24, { release: 0.6 });
       tone(c, o, t + 0.2, hz('E7'), 0.5, 'sine', 0.08, { release: 0.3 });
     },
     /* soft "thinking" music: one 4-second pattern (repeated while it plays) */

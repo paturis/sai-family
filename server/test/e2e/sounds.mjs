@@ -11,7 +11,7 @@ const OUT = process.env.SOUNDS_OUT;
 if (OUT) fs.mkdirSync(OUT, { recursive: true });
 // name -> [seconds to render, min seconds of audible sound, max seconds of audible sound]
 const SPEC = { ding: [3, 0.6, 2.4], buzzer: [2, 0.6, 1.4], timeup: [2, 0.8, 1.6], tick: [0.4, 0.02, 0.2], fanfare: [3, 1.0, 2.6], applause: [5, 2.0, 4.8],
-  drumroll: [5, 3.0, 4.9], sting: [2, 0.4, 1.6], steal: [1.5, 0.5, 1.4], fastmoney: [3.5, 1.5, 3.2], intro: [7, 3.0, 6.5], thinking: [5, 3.0, 4.9] };
+  drumroll: [5, 3.0, 4.9], sting: [2, 0.4, 1.6], steal: [1.5, 0.5, 1.4], fastmoney: [3.5, 1.5, 3.2], intro: [7, 3.0, 6.5], thinking: [5, 3.0, 4.9], faceoff: [1.5, 0.3, 1.2], buzzin: [2, 0.6, 1.6] };
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage();

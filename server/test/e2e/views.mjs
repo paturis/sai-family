@@ -204,6 +204,16 @@ check('Fallback: the tech names Team A by hand, projector shows it', await waitT
 await tc(tech, '[data-fo="reset"]');
 check('Reset clears the projector overlay', await waitFn(proj, () => !document.getElementById('fo').classList.contains('on')));
 await padA.close(); await padB.close();
+/* the other games (Jeopardy, Antakshari…) also play through the projector */
+const otherSnd = await proj.evaluate(() => {
+  const out = [], o = Sound.play; Sound.play = function (n) { out.push(n); return true; };
+  soundForDoc({ game: 'jeopardy', teams: [{ score: 0 }, { score: 0 }] }, { game: 'jeopardy', teams: [{ score: 200 }, { score: 0 }] });
+  soundForDoc({ game: 'jeopardy', teams: [{ score: 200 }, { score: 0 }] }, { game: 'jeopardy', teams: [{ score: 0 }, { score: 0 }] });
+  soundForLive({ mode: 'buzzer', phase: 'idle', q: 1 }, { mode: 'buzzer', phase: 'open', q: 1 });
+  soundForLive({ mode: 'buzzer', phase: 'open', q: 1 }, { mode: 'buzzer', phase: 'locked', q: 1 });
+  Sound.play = o; return out;
+});
+check('PROJECTOR sounds for the other games: points up = ding, down = buzzer, buzzers ready, buzz-in', JSON.stringify(otherSnd) === '["ding","buzzer","faceoff","buzzin"]', JSON.stringify(otherSnd));
 
 
 /* ---------- running the board: reveal, strike, award, and take each one back ---------- */

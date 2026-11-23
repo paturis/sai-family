@@ -474,7 +474,12 @@ function onStats(s){ST=s;var c=document.getElementById('qc'),v=document.getEleme
 function snd(n){try{if(!PREVIEW&&window.Sound)Sound.play(n)}catch(e){}}
 function nOn(r){return r.answers.filter(function(a){return a.on}).length}
 function soundForDoc(p,d){
-  if(!d)return;var pr=p&&p.round,nr=d.round;
+  if(!d)return;
+  /* the other games (Jeopardy, Antakshari, …): points up = ding (fanfare for a big gain), points down = buzzer */
+  if(d.game&&p&&p.game===d.game&&Array.isArray(d.teams)&&Array.isArray(p.teams)&&d.teams.length===p.teams.length){
+    var gain=0,loss=false;d.teams.forEach(function(t,i){var df=(+t.score||0)-(+p.teams[i].score||0);if(df>0)gain=Math.max(gain,df);if(df<0)loss=true});
+    if(loss&&!gain)snd('buzzer');else if(gain>=500){snd('fanfare');setTimeout(function(){snd('applause')},250)}else if(gain>0)snd('ding')}
+  var pr=p&&p.round,nr=d.round;
   if(nr&&pr&&pr.n===nr.n){
     if(nOn(nr)>nOn(pr))snd('ding');
     if(nr.strikes>pr.strikes)snd('buzzer');
@@ -493,6 +498,9 @@ function soundForLive(p,d){
   if(p&&d.mode!=='buzzer'){
     if(d.phase==='open'&&(p.phase!=='open'||p.q!==d.q))snd('sting');
     if(p.phase==='open'&&d.phase==='closed'&&p.q===d.q)snd('timeup')}
+  if(p&&d.mode==='buzzer'){   // phone buzzers in the other games: ready sound, then the buzz-in sound
+    if(d.phase==='open'&&(p.phase!=='open'||p.q!==d.q))snd('faceoff');
+    if(d.phase==='locked'&&p.phase!=='locked')snd('buzzin')}
   if(d.snd&&window.Sound){Sound.setMuted(!!d.snd.mute);if(typeof d.snd.vol==='number')Sound.setVolume(d.snd.vol);Sound.setPack(d.snd.pack||'builtin')}
   // a cue from the tech's soundboard (cues already in the document when this page opens are not replayed)
   if(!cueSeen){cueSeen=true;lastCue=d.cue&&d.cue.id}
