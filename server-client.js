@@ -46,8 +46,21 @@
     hbT = setInterval(function () {
       send({ t: 'ping' });
       clearTimeout(pongT);
-      pongT = setTimeout(function () { try { ws.close(); } catch (e) { /* already closed */ } }, 10000); // half-open connection
-    }, 20000);
+      pongT = setTimeout(reconnectNow, 8000); // half-open connection: no answer, so start over
+    }, 15000);
+  }
+  /** The socket looks dead (phone was asleep, wifi changed): drop it and open a fresh one right now. A fresh subscription
+      makes the server send the current state again, so the screen catches up by itself. */
+  function reconnectNow() {
+    var dead = ws; ws = null;
+    if (dead) { dead.onclose = dead.onmessage = dead.onerror = null; try { dead.close(); } catch (e) { /* ignore */ } }
+    stopHb(); wsState = 'offline'; emit(); tries = 0; clearTimeout(reconnectT); connect();
+  }
+  /** Is the connection still alive? Ask, and reconnect if there is no answer within 3 seconds. */
+  function probe() {
+    if (closed) return;
+    if (!ws || ws.readyState !== 1) { tries = 0; connect(); return; }
+    send({ t: 'ping' }); clearTimeout(pongT); pongT = setTimeout(reconnectNow, 3000);
   }
   function schedule() {
     if (closed) return;
@@ -93,8 +106,11 @@
     closed = true; clearTimeout(reconnectT); stopHb();
     if (ws) { try { ws.close(); } catch (e) { /* ignore */ } }
   }
-  document.addEventListener('visibilitychange', function () { if (!document.hidden && wsState !== 'online') { tries = 0; connect(); } });
-  window.addEventListener('online', function () { tries = 0; connect(); });
+  // a phone that was locked or switched away often has a dead socket that still looks open: check as soon as it wakes
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) probe(); });
+  window.addEventListener('pageshow', probe);
+  window.addEventListener('focus', probe);
+  window.addEventListener('online', function () { tries = 0; reconnectNow(); });
 
   /* ---------- auth: personal login links ---------- */
   function parseLogin(v) {

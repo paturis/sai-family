@@ -222,6 +222,25 @@ check('Fallback: the tech names Team A by hand, projector shows it', await waitT
 await tc(tech, '[data-fo="reset"]');
 check('Reset clears the projector overlay', await waitFn(proj, () => !document.getElementById('fo').classList.contains('on')));
 await padA.close(); await padB.close();
+/* an emcee who opens the show AFTER the game began, whose phone wakes with a dead connection, still catches up by itself */
+const emc2 = await ctxPage(430, 900);
+await emc2.evaluateOnNewDocument(() => { const W = window.WebSocket; window.__wss = []; window.WebSocket = function (...a) { const w = new W(...a); window.__wss.push(w); return w; }; window.WebSocket.prototype = W.prototype; });
+await emc2.goto(`${base}/emcee.html?login=${app.auth.createLoginLink('ravi@example.org').token}`, { waitUntil: 'networkidle0' });
+await emc2.waitForSelector('[data-a="open"]', { timeout: 8000 }); await emc2.click('[data-a="open"]');
+check('EMCEE (joined mid-game) shows the face-off panel', await waitFn(emc2, () => !!document.querySelector('[data-a="foready"]')), await text(emc2));
+await tc(tech, '[data-fo="ready"]');
+check('EMCEE (joined mid-game) sees READY without refreshing', await waitText(emc2, /Buzzers READY/), waitText.last);
+await tc(tech, '[data-fo="open"]');
+check('EMCEE (joined mid-game) sees OPEN without refreshing', await waitText(emc2, /Buzzers are OPEN/), waitText.last);
+await tc(tech, '[data-fo="reset"]');
+await waitFn(emc2, () => !/Buzzers are OPEN/.test(document.body.innerText));
+await emc2.evaluate(() => window.__wss.forEach((w) => { w.onmessage = () => {}; w.send = () => {}; }));   // the connection silently dies
+await tc(tech, '[data-fo="ready"]'); await sleep(1200);
+check('(sanity) a deaf emcee page does not see the change', !/Buzzers READY/.test(await text(emc2)));
+await emc2.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));                // the phone wakes up
+check('EMCEE with a dead connection notices on wake and catches up by itself', await waitText(emc2, /Buzzers READY/, 12000), waitText.last);
+await tc(tech, '[data-fo="reset"]');
+await emc2.close();
 /* deep link: a bookmarked address lands on the right page after sign-in */
 const deep = await ctxPage(1280, 800);
 await deep.goto(`${base}/?login=${app.auth.createLoginLink('boss').token}#/questions`, { waitUntil: 'networkidle0' });

@@ -343,7 +343,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function topBar(){return '<div class="top"><div style="display:flex;align-items:center;gap:10px"><span class="sssio-logo"></span><div><div class="k">SSSIO · EMCEE VIEW</div><div class="small">'+(state.user?esc(state.user.email)+' · read-only':'Read-only live view of the game board')+'</div></div></div><div>'+
   (state.sv?'<button data-a="back">Games</button> ':'')+(state.user?'<button data-a="out">Sign out</button>':'')+'</div></div>'}
 function draw(){
-  var h=topBar();
+  var h=topBar()+(state.offline&&state.stage!=='login'?'<div class="ok" style="background:#ffe3e0;color:#9b1c10;border-color:#e9a39b">⚠ Connection lost — reconnecting. What you see may be out of date.</div>':'');
   if(state.stage==='login')h+='<div class="card"><h1>Game host sign-in</h1>'+(window.BACKEND==='server'?serverLogin():'<p class="small">Sign in with the Google account an admin approved for you. This screen shows the hidden answers, so it is not public.</p><button class="gold" data-a="in">Sign in with Google</button>')+'<div class="small" style="color:var(--coral);margin-top:10px">'+esc(state.msg)+'</div><div class="small" style="color:#7ee0b5;margin-top:8px">'+esc(state.note||'')+'</div></div>';
   else if(state.stage==='denied')h+='<div class="card"><h1>Not approved</h1><p class="small">'+esc(state.user&&state.user.email)+' has not been approved as a host. Ask an admin to add you.</p></div>';
   else if(state.stage==='list'){
@@ -458,6 +458,7 @@ function serverLogin(){
   return '<p class="small">Paste the personal login link an admin sent you. This screen shows the hidden answers, so it is not public.</p><input id="loginTok" placeholder="Paste your login link" autocomplete="off" '+inp+'><button class="gold" data-a="in">Sign in</button>'}
 function serverBackend(){
   var C=window.SrvClient;
+  C.onStatus(function(st){var off=st!=='online';if(off!==!!state.offline){state.offline=off;draw()}});   // say so when the connection drops
   return{
     requestLink:function(e){return C.requestLink(e)},
     signIn:function(v){return C.signIn(v)},
