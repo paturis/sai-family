@@ -63,7 +63,9 @@ Each person has their own screen, and each screen has one job. The **Links** but
    no one touches it. By itself it shows: a "welcome" screen, the join **QR code** and code (with a live count of phones that have
    joined), each survey **question** with the live answer count and countdown, "Counting the votes", "Contestants, please come up",
    and then the game board, strikes, scores and the steal banner. It keeps the screen awake and reconnects on its own.
-2. **Tech laptop** — the console (`/`). Sees everything and controls everything: the survey, the board with the hidden answers
+2. **Tech laptop** — the console (`/`). Sees everything and controls everything, including **who is connected right now**: chips show
+   whether the projector is live (green) or NOT connected (red), how many emcees and audience phones are on, and a warning if a second tech
+   console is open (two consoles can overwrite each other). The tech's own preview window is never mistaken for a projector. It controls: the survey, the board with the hidden answers
    dimmed, strikes, awards, score corrections, timers, and a **live preview of the projector** with an Intermission / Blank override.
 3. **Emcee phone** — `/emcee.html`, signed in as a host. Follows the survey (question, answer count, seconds left), then switches
    to the board by itself when the game starts, showing the hidden answers, strikes and scores. Read-only.

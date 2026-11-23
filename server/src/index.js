@@ -62,7 +62,11 @@ export async function createApp(overrides = {}) {
   const statsFor = (code) => {
     const l = store.live.get(code);
     const q = l && Number.isInteger(l.q) ? l.q : -1;
-    return { q, count: q >= 0 ? store.answers.count(code, q) : 0, devices: hub.count('live:' + code, { audienceOnly: true }) };
+    const devices = hub.count('live:' + code, { audienceOnly: true });
+    // who is connected right now, by role. Screens announce themselves with a "hello"; phones are counted by what they watch.
+    const presence = { audience: devices, projector: 0, emcee: 0, tech: 0 };
+    for (const ws of wss.clients) if (ws.readyState === 1 && ws.presence && ws.presence.code === code) presence[ws.presence.role]++;
+    return { q, count: q >= 0 ? store.answers.count(code, q) : 0, devices, presence };
   };
   const statsSoon = (code) => {
     if (statsTimers.has(code) || !hub.count('stats:' + code)) return;
@@ -266,13 +270,17 @@ export async function createApp(overrides = {}) {
   wss.on('connection', (ws) => {
     ws.on('pong', () => { ws.alive = true; });
     ws.on('error', () => {});
-    ws.on('close', () => hub.dropAll(ws));
+    ws.on('close', () => { hub.dropAll(ws); if (ws.presence) statsSoon(ws.presence.code); });
     ws.on('message', (raw) => {
       ws.alive = true;
       if (++ws.msgs > 60) return ws.close(1008, 'too many messages');
       let m;
       try { m = JSON.parse(raw.toString()); } catch { return; }
       if (m.t === 'ping') return ws.send('{"t":"pong"}');
+      if (m.t === 'hello') { // "I am the projector / an emcee / a tech console, watching this game"
+        if (okCode(m.code) && ['projector', 'emcee', 'tech'].includes(m.role)) { ws.presence = { code: m.code, role: m.role }; statsSoon(m.code); }
+        return;
+      }
       if (m.t === 'sub') {
         if (!channelAllowed(ws, m.ch)) return ws.send(JSON.stringify({ t: 'err', ch: m.ch, code: 'forbidden' }));
         if (ws.chs && ws.chs.size >= 8 && !ws.chs.has(m.ch)) return;

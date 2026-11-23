@@ -376,6 +376,7 @@ G.register({
 var FB='https://www.gstatic.com/firebasejs/10.12.2/';
 var app=document.getElementById('app'),fxEl=document.getElementById('fx');
 var code=(new URLSearchParams(location.search).get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+var PREVIEW=/[?&]preview=1/.test(location.search); // the tech's small preview window: not a real projector
 var D=null,L=null,ST=null,offset=0,prevStrikes=0,prevKey='',timerT=null,qT=null,lastScreen=null,lastCue=null,cueSeen=false,tickAt=-1,gTick=-1;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 
@@ -443,7 +444,7 @@ function onStats(s){ST=s;var c=document.getElementById('qc'),v=document.getEleme
   if(c&&s&&L&&s.q===L.q)c.textContent=s.count;if(v&&s)v.textContent=s.devices;
   if(!c&&!v&&s&&(pick()==='lobby'||pick()==='question'||pick()==='closed'))draw()}
 /* ---------- sound: the hall speakers are on THIS laptop, so every sound is played here ---------- */
-function snd(n){try{if(window.Sound)Sound.play(n)}catch(e){}}
+function snd(n){try{if(!PREVIEW&&window.Sound)Sound.play(n)}catch(e){}}
 function nOn(r){return r.answers.filter(function(a){return a.on}).length}
 function soundForDoc(p,d){
   if(!d)return;var pr=p&&p.round,nr=d.round;
@@ -499,7 +500,8 @@ async function firebaseBackend(){
   if(!code){askCode();return}
   draw();
   var b;try{b=window.__displayMock||(window.BACKEND==='server'?{subscribe:function(c,cb){return window.SrvClient.subscribe('display:'+c,cb,{screen:true})},subscribeLive:function(c,cb){return window.SrvClient.subscribe('live:'+c,cb,{screen:true})},subscribeStats:function(c,cb){return window.SrvClient.subscribe('stats:'+c,cb,{screen:true})}}:await firebaseBackend())}catch(e){app.innerHTML='<div class="wait"><h1>Could not connect</h1><p>'+esc(e.message)+'</p></div>';return}
-  kiosk();
+  if(PREVIEW){var sb0=document.getElementById('snd');if(sb0)sb0.style.display='none'}
+  else{kiosk();if(window.SrvClient&&window.BACKEND==='server')window.SrvClient.hello(code,'projector')}
   if(b.subscribeLive)b.subscribeLive(code,onLive);
   if(b.subscribeStats)b.subscribeStats(code,onStats);
   b.subscribe(code,onDoc)})();

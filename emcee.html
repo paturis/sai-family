@@ -364,6 +364,7 @@ function surveyView(){
 function stopSurvey(){state.subs.forEach(function(f){try{f()}catch(e){}});state.subs=[];clearInterval(state.poll);clearInterval(state.tick);state.L=null;state.ST=null}
 function openShow(sv){
   if(state.unsub){state.unsub();state.unsub=null}stopSurvey();state.sv=sv;state.S=null;
+  if(B.hello&&sv.code)B.hello(sv.code,'emcee');
   if(sv.status==='live'&&sv.code&&B.watchLive){
     state.stage='survey';draw();
     state.subs.push(B.watchLive(sv.code,function(l){state.L=l;if(l&&l.hostNow)state.offset=l.hostNow-Date.now();draw()}));
@@ -437,6 +438,7 @@ function serverBackend(){
     onAuth:function(cb){C.authInit(function(u){if(!u&&C.authError())state.msg=C.authError();cb(u)})},
     getRole:function(u){return Promise.resolve(u&&u.role||null)},
     listReady:function(){return C.rpc('listReady')},
+    hello:function(code,role){C.hello(code,role)},
     listActive:function(){return C.rpc('listActive')},
     getSurvey:function(id){return C.rpc('getSurvey',id)},
     watchLive:function(code,cb){return C.subscribe('live:'+code,cb,{screen:true})},

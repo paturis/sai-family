@@ -38,7 +38,7 @@
   }
 
   /* ---------- realtime ---------- */
-  var ws = null, subs = {}, meta = {}, last = {}, tries = 0, reconnectT = null, hbT = null, pongT = null, closed = false;
+  var helloMsg = null, ws = null, subs = {}, meta = {}, last = {}, tries = 0, reconnectT = null, hbT = null, pongT = null, closed = false;
   function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
   function stopHb() { clearInterval(hbT); clearTimeout(pongT); }
   function startHb() {
@@ -63,6 +63,7 @@
     mine.onopen = function () {
       tries = 0; wsState = 'online'; emit(); startHb();
       Object.keys(subs).forEach(function (ch) { send({ t: 'sub', ch: ch, screen: !!meta[ch] }); });
+      if (helloMsg) send(helloMsg);
     };
     mine.onmessage = function (ev) {
       var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
@@ -74,6 +75,8 @@
     mine.onclose = function () { if (ws === mine) { wsState = 'offline'; stopHb(); emit(); schedule(); } };
     mine.onerror = function () { try { mine.close(); } catch (e) { /* ignore */ } };
   }
+  /** tell the server who this screen is (projector / emcee / tech) so the tech can see who is connected */
+  function hello(code, role) { helloMsg = { t: 'hello', code: code, role: role }; connect(); send(helloMsg); }
   function subscribe(ch, cb, opts) {
     if (opts && opts.screen) meta[ch] = true;
     (subs[ch] = subs[ch] || []).push(cb);
@@ -136,7 +139,7 @@
   }
 
   window.SrvClient = {
-    post: post, rpc: rpc, subscribe: subscribe, connect: connect, close: close, onStatus: onStatus, status: status,
+    post: post, rpc: rpc, subscribe: subscribe, hello: hello, connect: connect, close: close, onStatus: onStatus, status: status,
     authInit: authInit, signIn: signIn, requestLink: requestLink, mailEnabled: function () { return mailOn; }, signOut: signOut, parseLogin: parseLogin,
     me: function () { return meUser; }, authError: function () { return authError; }
   };

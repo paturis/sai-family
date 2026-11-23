@@ -136,7 +136,7 @@ test('stats channel: live answer count and connected devices, public, throttled'
     const screen = await client(s.base).ws();
     sub(screen, 'stats:STAT1');
     await until(() => docs(screen, 'stats:STAT1').length >= 1);
-    assert.deepEqual(docs(screen, 'stats:STAT1')[0].data, { q: 2, count: 0, devices: 0 });
+    assert.deepEqual(docs(screen, 'stats:STAT1')[0].data, { q: 2, count: 0, devices: 0, presence: { audience: 0, projector: 0, emcee: 0, tech: 0 } });
 
     // 3 phones join: devices go up
     const phones = [];
@@ -162,6 +162,45 @@ test('stats channel: live answer count and connected devices, public, throttled'
     await wait(50);
     await client(s.base).post('/api/answer', { code: 'STAT1', q: 3, a: 'x' });
     phones.forEach((p) => p.close());
+  } finally { await s.close(); }
+});
+
+test('presence: the tech can see the projector, emcees, other tech consoles and phones', async () => {
+  const s = await startApp();
+  try {
+    const watcher = await client(s.base).ws();
+    sub(watcher, 'stats:PRES1');
+    const hello = (ws, role, code = 'PRES1') => ws.send(JSON.stringify({ t: 'hello', code, role }));
+    const last = () => docs(watcher, 'stats:PRES1').at(-1).data.presence;
+    await until(() => docs(watcher, 'stats:PRES1').length >= 1);
+    assert.deepEqual(last(), { audience: 0, projector: 0, emcee: 0, tech: 0 });
+
+    const projector = await client(s.base).ws(); sub(projector, 'display:PRES1'); hello(projector, 'projector');
+    await until(() => last().projector === 1);
+    const emcee1 = await client(s.base).ws(); hello(emcee1, 'emcee');
+    const emcee2 = await client(s.base).ws(); hello(emcee2, 'emcee');
+    const tech1 = await client(s.base).ws(); hello(tech1, 'tech');
+    const phones = [];
+    for (let i = 0; i < 3; i++) { const p = await client(s.base).ws(); sub(p, 'live:PRES1'); phones.push(p); }
+    await until(() => { const p = last(); return p.emcee === 2 && p.tech === 1 && p.audience === 3; });
+    assert.deepEqual(last(), { audience: 3, projector: 1, emcee: 2, tech: 1 });
+
+    // a second tech console is visible (the game must only be run from one)
+    const tech2 = await client(s.base).ws(); hello(tech2, 'tech');
+    await until(() => last().tech === 2);
+
+    // leaving (closing the page or losing the connection) is noticed
+    projector.close();
+    await until(() => last().projector === 0);
+    emcee1.terminate();
+    await until(() => last().emcee === 1);
+
+    // bad hellos change nothing; another game's screens are not counted here
+    hello(tech1, 'admin'); hello(tech1, 'tech', 'bad code'); tech1.send(JSON.stringify({ t: 'hello', code: 'PRES1' }));
+    const other = await client(s.base).ws(); hello(other, 'projector', 'OTHER1');
+    await wait(500);
+    assert.deepEqual(last(), { audience: 3, projector: 0, emcee: 1, tech: 2 });
+    [watcher, emcee2, tech1, tech2, other, ...phones].forEach((w) => w.close());
   } finally { await s.close(); }
 });
 

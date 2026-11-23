@@ -23,6 +23,7 @@
       <button class="btn small" id="dispBtn">📺 Audience display</button>
       <button class="btn small" id="linksBtn">🔗 Links</button>
       <span class="r0-chip hidden" id="syncHdr" data-sync></span>
+      <span class="conn-hdr hidden" id="connHdr"></span>
       <button class="btn small gold" id="presentBtn">⛶ Presentation mode</button>
     </div>
   </header>
@@ -1108,7 +1109,7 @@ function projectorNow(){if(A.projShow==='blank')return 'Blank screen';if(A.projS
   switch(A.stage){case 'lobby':return 'Join QR code';case 'collect':return A.phase==='open'?'Question '+(A.q+1)+' + live count':'Time is up';case 'tabulate':return 'Counting the votes';case 'gate':return 'Contestants, please enter';case 'off':return 'Game board';default:return '—'}}
 const projSelect=()=>'<label class="viewas">Projector <select data-proj>'+PROJ_MODES.map(m=>`<option value="${m[0]}" ${(A.projShow||'')===m[0]?'selected':''}>${m[1]}</option>`).join('')+'</select></label>';
 function projBar(here){if(!(Cloud.mode==='server'||Cloud.mode==='firebase')||!A.sv||!A.sv.code||!['lobby','collect','tabulate','gate'].includes(here))return '';
-  return `<span class="r0-chip" title="What the projector laptop is showing right now">🖥 ${esc(projectorNow())}</span>${Cloud.mode==='server'&&['lobby','collect'].includes(here)?'<span class="r0-chip" data-stat-devices>📱 …</span>':''}${projSelect()}`}
+  return `<span class="r0-chip" title="What the projector laptop is showing right now">🖥 ${esc(projectorNow())}</span>${Cloud.mode==='server'?connChips():''}${projSelect()}`}
 async function setProjector(v){A.projShow=v;document.querySelectorAll('[data-proj]').forEach(x=>{x.value=v});const code=A.sv&&A.sv.code;if(!code)return;
   try{await Cloud.liveUpdate(code,{show:v,hostNow:Date.now()});toast(v?'Projector: '+(PROJ_MODES.find(m=>m[0]===v)||[])[1]:'Projector is back on automatic')}catch(e){toast('Could not change the projector: '+(e.message||e))}}
 document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.proj!==undefined)setProjector(t.value)});
@@ -1122,7 +1123,7 @@ function renderProjPanel(){const el=document.getElementById('projPanel');if(!el)
   const prev=A.projPrev!==false,key=code+'|'+prev;
   if(el.dataset.key===key){const st=el.querySelector('[data-proj-now]');if(st)st.textContent=projectorNow();scalePreview();return}
   el.dataset.key=key;   // built once: the preview keeps playing while the board changes
-  el.innerHTML=`<div class="panel"><h3>PROJECTOR</h3><div class="proj-now">Showing: <b data-proj-now>${esc(projectorNow())}</b></div>${projSelect()}<div class="control-row"><a class="btn small" href="${esc(displayUrl())}" target="_blank" rel="noopener">Open projector page ↗</a><button class="btn small" data-projprev="1">${prev?'Hide preview':'Show preview'}</button></div>${prev?`<div class="proj-preview"><iframe src="${esc(displayUrl())}" title="Projector preview" tabindex="-1"></iframe></div><div class="tiny">This is exactly what the hall is seeing.</div>`:''}${soundBox()}</div>`;
+  el.innerHTML=`<div class="panel"><h3>PROJECTOR</h3><div class="proj-now">Showing: <b data-proj-now>${esc(projectorNow())}</b></div>${projSelect()}<div class="control-row"><a class="btn small" href="${esc(displayUrl())}" target="_blank" rel="noopener">Open projector page ↗</a><button class="btn small" data-projprev="1">${prev?'Hide preview':'Show preview'}</button></div>${prev?`<div class="proj-preview"><iframe src="${esc(displayUrl()+'&preview=1')}" title="Projector preview" tabindex="-1"></iframe></div><div class="tiny">This is exactly what the hall is seeing.</div>`:''}${soundBox()}</div>`;
   scalePreview();
   el.querySelectorAll('[data-cue]').forEach(b=>{b.onclick=()=>sendCue(b.dataset.cue)});
   el.querySelector('[data-snd-on]').onchange=()=>sendSnd(el);
@@ -1133,8 +1134,23 @@ function renderProjPanel(){const el=document.getElementById('projPanel');if(!el)
 function ensureStats(){const code=Cloud.mode==='server'&&A.sv&&A.sv.code;
   if(!code){if(A.statsOff){A.statsOff();A.statsOff=null;A.statsCode=''}return}
   if(A.statsCode===code)return;if(A.statsOff)A.statsOff();A.statsCode=code;A.stats=null;
-  A.statsOff=SrvClient.subscribe('stats:'+code,s=>{A.stats=s;updateStatsDom()},{screen:true})}
-function updateStatsDom(){const s=A.stats;if(!s)return;
+  A.statsOff=SrvClient.subscribe('stats:'+code,s=>{A.stats=s;updateStatsDom()},{screen:true});
+  SrvClient.hello(code,'tech')}
+/* who is connected right now: projector, emcees, audience phones, and a warning if two tech consoles are open */
+const CONN_KINDS=['projector','audience','emcee','tech'];
+const connChips=()=>CONN_KINDS.map(k=>`<span class="r0-chip conn" data-conn="${k}">…</span>`).join('');
+function connInfo(k,p){
+  if(k==='projector')return p.projector>0?{t:'🖥 '+(p.projector>1?p.projector+' projectors':'Projector connected'),c:'ok',tip:'The projector page is open and connected'}:{t:'🖥 Projector NOT connected',c:'bad',tip:'Open the projector page on the projector laptop (Links button)'};
+  if(k==='audience')return{t:'📱 '+p.audience+(p.audience===1?' phone':' phones'),c:p.audience?'ok':'',tip:'Audience phones connected right now'};
+  if(k==='emcee')return p.emcee?{t:'🎙 '+p.emcee+(p.emcee===1?' emcee':' emcees'),c:'ok',tip:'Emcee phones following the show'}:{t:'🎙 No emcee yet',c:'',tip:'The emcee opens the emcee page and picks the show'};
+  if(k==='tech')return p.tech>1?{t:'⚠ '+p.tech+' tech consoles open — run the game from only one',c:'warn',tip:'Two consoles can overwrite each other. Close the extra one.'}:null;
+  return null}
+function updateConn(){
+  const p=A.stats&&A.stats.presence,hdr=document.getElementById('connHdr');
+  if(hdr){const show=Cloud.mode==='server'&&A.sv&&A.sv.code&&A.stage==='off';hdr.classList.toggle('hidden',!show);if(show&&!hdr.firstChild)hdr.innerHTML=connChips()}
+  document.querySelectorAll('[data-conn]').forEach(el=>{const k=el.dataset.conn,i=p?connInfo(k,p):{t:k==='tech'?'':'… checking',c:''};
+    el.classList.remove('ok','warn','bad');if(!i){el.classList.add('hidden');return}el.classList.remove('hidden');el.textContent=i.t;if(i.c)el.classList.add(i.c);if(i.tip)el.title=i.tip})}
+function updateStatsDom(){updateConn();const s=A.stats;if(!s)return;
   document.querySelectorAll('[data-stat-devices]').forEach(e=>{e.textContent='📱 '+s.devices+(s.devices===1?' phone':' phones')+' connected'});
   if(A.stage==='collect'&&s.q===A.q){A.count=s.count;const c=$('r0Count');if(c)c.textContent=s.count}}
 /* Links panel: copy-paste links for phones, hall screen and emcee */

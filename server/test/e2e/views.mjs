@@ -75,6 +75,7 @@ const code = await tech.evaluate(() => window.__console.A.sv.code);
 console.log('survey launched with code', code);
 
 /* ---------- projector laptop: opens the one URL and stays on it ---------- */
+check('TECH sees "Projector NOT connected" before anyone opens the projector page', await waitText(tech, /Projector NOT connected/), waitText.last);
 const proj = await ctxPage(1920, 1080);
 await proj.goto(`${base}/display.html?code=${code}`, { waitUntil: 'networkidle0' });
 const installRecorder = () => proj.evaluate(() => { window.__played = []; const o = Sound.play; Sound.play = function (n) { const r = o.apply(this, arguments); window.__played.push([n, r]); return r; }; });
@@ -86,12 +87,14 @@ await proj.click('#snd');                                  // the person at the 
 check('PROJECTOR sound is on after that one click (and says so)', await waitText(proj, /Sound on/) && await proj.evaluate(() => Sound.state().unlocked), waitText.last);
 check('PROJECTOR confirmed with a test ding that really played', (await proj.evaluate(() => window.__played.filter((x) => x[0] === 'ding' && x[1] === true).length)) === 1);
 await sleep(600); await snap(proj, 'p1-projector-lobby');
+check('TECH sees the projector connected as soon as it opens', await waitText(tech, /Projector connected/), waitText.last);
 check('PROJECTOR lobby: join QR code, code and instructions', await waitText(proj, new RegExp(`Scan to play[\\s\\S]*${code}`)) && await proj.evaluate(() => !!document.querySelector('.qr svg')), waitText.last);
 
 const phones = Array.from({ length: 12 }, () => new Phone());
 for (let i = 0; i < 5; i++) await joinPhone(code);
 check('PROJECTOR lobby: shows how many phones joined (5)', await waitText(proj, /5 phones connected/), waitText.last);
 check('TECH lobby: also shows 5 phones connected', await waitText(tech, /5 phones connected/), waitText.last);
+check('TECH connection chip: 5 phones', await waitFn(tech, () => (document.querySelector('[data-conn="audience"]') || {}).textContent.includes('5 phones')));
 
 /* ---------- emcee phone ---------- */
 const emcee = await ctxPage(430, 900);
@@ -99,6 +102,7 @@ await emcee.goto(`${base}/emcee.html?login=${app.auth.createLoginLink('ravi@exam
 check('EMCEE list shows the running survey', await waitText(emcee, /Camp Show[\s\S]*Survey in progress/), waitText.last);
 await emcee.click('[data-a="open"]');
 await sleep(400); await snap(tech, 't1-tech-lobby'); await snap(emcee, 'e1-emcee-waiting');
+check('TECH connection chip: 1 emcee once the emcee opens the show', await waitFn(tech, () => (document.querySelector('[data-conn="emcee"]') || {}).textContent.includes('1 emcee')));
 check('EMCEE sees "waiting for the first question" and phone count', await waitText(emcee, /Waiting for the first question[\s\S]*Phones connected: 5/), waitText.last);
 
 /* ---------- survey questions ---------- */
@@ -145,6 +149,8 @@ const preview = tech.frames().find((f) => f.url().includes('display.html'));
 check('TECH projector preview is the real projector page showing the board', !!preview && await waitFn(preview, () => document.querySelectorAll('.a').length === 5, null, 8000));
 
 /* ---------- running the board: reveal, strike, award, and take each one back ---------- */
+check('TECH header chips stay visible while running the game', await tech.evaluate(() => { const h = document.getElementById('connHdr'); return !h.classList.contains('hidden') && h.querySelectorAll('[data-conn]').length >= 3; }));
+check('TECH counts exactly ONE projector (its own preview window does not count)', await tech.evaluate(() => [...document.querySelectorAll('#connHdr [data-conn="projector"]')].every((e) => e.textContent === '🖥 Projector connected')));
 const onProj = () => proj.evaluate(() => document.querySelectorAll('.a.on').length);
 const strikesProj = () => proj.evaluate(() => document.querySelectorAll('.strikes i.on').length);
 const scoresProj = () => proj.evaluate(() => [...document.querySelectorAll('.team .s')].map((e) => e.textContent));
@@ -227,6 +233,19 @@ await tech.select('#projPanel [data-proj]', 'blank');
 check('PROJECTOR override: blank screen', await waitFn(proj, () => document.getElementById('app').innerHTML.trim() === ''));
 await tech.select('#projPanel [data-proj]', '');
 check('PROJECTOR back to the game automatically', await waitFn(proj, () => document.querySelectorAll('.a').length === 5));
+
+/* ---------- connections: a second tech console is flagged, and a closed projector is noticed ---------- */
+const svId = await tech.evaluate(() => window.__console.A.sv.id);
+const tech2 = await ctxPage(1000, 700);
+await tech2.goto(`${base}/?login=${app.auth.createLoginLink('boss').token}&__test=1`, { waitUntil: 'networkidle0' });
+await tech2.waitForSelector('.a-tabs', { timeout: 10000 });
+check('no warning while only one tech console is open', await tech.evaluate(() => (document.querySelector('#connHdr [data-conn="tech"]') || { classList: { contains: () => true } }).classList.contains('hidden')));
+await tech2.evaluate(async (id) => { await window.__console.openSv(id); }, svId);
+check('TECH is warned when a SECOND tech console opens the same game', await waitText(tech, /2 tech consoles open/), waitText.last);
+await tech2.close();
+check('...and the warning clears when it closes', await waitFn(tech, () => document.querySelector('#connHdr [data-conn="tech"]').classList.contains('hidden')));
+await proj.close();
+check('TECH sees the projector drop out when its page is closed', await waitText(tech, /Projector NOT connected/), waitText.last);
 
 /* ---------- audience phone page still works alongside ---------- */
 const aud = await ctxPage(390, 800);
