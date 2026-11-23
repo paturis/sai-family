@@ -43,6 +43,16 @@ html,body{background:radial-gradient(ellipse 90% 60% at 50% -10%,var(--navy-600)
 .banner{margin:0 0 1.4vh;padding:1.2vh;text-align:center;border-radius:10px;background:rgba(180,50,44,.55);border:2px solid #ff8a80;color:#fff;font-weight:800;font-size:clamp(16px,2.2vw,32px);animation:pulse 1.1s infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 10px rgba(255,138,128,.2)}}
 .ok{text-align:center;color:var(--teal-on-dark);font-weight:700;font-size:clamp(16px,2vw,30px);margin-top:1vh}
+.sf{margin-top:1.4vh}
+.sfr{display:grid;grid-template-columns:3vw 1fr 23vw 23vw;gap:1vw;align-items:center;padding:1.1vh .8vw;border-top:1px solid rgba(255,255,255,.14)}
+.sfr:first-child{border-top:0}.sfr.cur{background:rgba(230,126,23,.14);border-radius:1vh}.sfr.dim{opacity:.4}
+.sfr .no{font:700 clamp(22px,2.6vw,42px) var(--font-head);color:var(--orange-on-dark)}
+.sfr .sq{font-size:clamp(16px,2vw,32px);font-weight:700;line-height:1.2}
+.sfc{display:flex;flex-direction:column;position:relative;padding:.8vh 1vw;border-radius:1vh;background:rgba(255,255,255,.08);min-height:7vh;justify-content:center}
+.sfc small{font:700 clamp(10px,.9vw,15px) var(--font);letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+.sfc b{font-size:clamp(16px,1.9vw,30px)}.sfc i{position:absolute;right:.8vw;top:50%;transform:translateY(-50%);font:800 clamp(22px,2.6vw,42px)/1 var(--font-head);font-style:normal}
+.sfc.ok{background:#1f6b36}.sfc.bad{background:#7d2118}.sfc.hid b{opacity:.5}
+.sftot{display:flex;justify-content:center;gap:6vw;margin-top:2vh;font-size:clamp(20px,2.4vw,40px);font-weight:700}.sftot b{color:var(--orange-on-dark);margin-left:.5vw}
 .fq{display:flex;gap:1.4vw;padding:1.6vh 1vw;border-top:1px solid rgba(255,255,255,.14);align-items:baseline}
 .fq:first-child{border-top:0}
 .fq .no{font:700 clamp(22px,2.8vw,44px) var(--font-head);color:var(--orange-on-dark)}
@@ -410,8 +420,15 @@ function drawGame(){
     '<div class="mid"><div><b>ONE SAI FAMILY</b><span>SURVEY SAYS!</span>'+(D.timerRunning?'<div class="timer'+(tl<=5?' u':'')+'" id="tm">'+String(tl).padStart(2,'0')+'s</div>':'')+'</div></div>'+
     '<div class="team'+(ctl==='B'?' ctl':'')+'"><div><div class="l">TEAM B'+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</div><div class="n">'+esc(t.B.name)+'</div></div><div class="s">'+t.B.score+'</div></div></div>';
   if(D.view==='fast'&&D.fast){
-    h+='<div class="cat">⚡ SAI FIVE · '+D.fast.questions.length+' QUESTIONS</div><div style="margin-top:2vh">'+
-      D.fast.questions.map(function(f,i){return '<div class="fq"><span class="no">'+(i+1)+'</span><div><div class="t">'+esc(f.q)+'</div>'+(f.answers?'<div class="ans">'+f.answers.map(function(a){return esc(a.t)+' ('+a.p+')'}).join(' · ')+'</div>':'')+'</div></div>'}).join('')+'</div>';
+    var F=D.fast;
+    var cell=function(r,k){var c=r[k],nm=esc(t[k].name);
+      if(!c)return '<div class="sfc hid"><small>'+nm+'</small><b>• • •</b></div>';
+      if(c.ok)return '<div class="sfc ok"><small>'+nm+'</small><b>'+esc(c.t)+'</b><i>'+c.p+'</i></div>';
+      return '<div class="sfc bad"><small>'+nm+'</small><b>✕ '+esc(c.t||(c.none?'No answer':'Not on the board'))+'</b><i>0</i></div>'};
+    h+='<div class="cat">⚡ SAI FIVE · '+F.n+' QUESTIONS · 2× POINTS</div><div class="sf">'+F.rows.map(function(r,i){
+      if(!r.q)return '<div class="sfr dim"><span class="no">'+(i+1)+'</span><div class="sq">• • •</div></div>';
+      return '<div class="sfr'+(i===F.q?' cur':'')+'"><span class="no">'+(i+1)+'</span><div class="sq">'+esc(r.q)+'</div>'+cell(r,'A')+cell(r,'B')+'</div>'}).join('')+'</div>'+
+      '<div class="sftot"><div>'+esc(t.A.name)+' <b>'+F.totals.A+'</b></div><div>'+esc(t.B.name)+' <b>'+F.totals.B+'</b></div></div>';
     if(D.fast.awarded){var w=t.A.score===t.B.score?null:(t.A.score>t.B.score?t.A:t.B);
       h+='<div class="win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It’s a tie — One Sai Family wins!')+'</h2><div>'+esc(t.A.name)+' '+t.A.score+' — '+t.B.score+' '+esc(t.B.name)+'</div></div>'}
   }else if(D.round){
@@ -496,7 +513,8 @@ function soundForDoc(p,d){
   }else if(nr&&pr)snd('sting');
   if(p&&d.view==='fast'&&p.view!=='fast')snd('saifive');
   if(p&&p.fast&&d.fast){
-    if(d.fast.reveal&&!p.fast.reveal)snd('ding');
+    if(d.fast.shown>p.fast.shown){var rw=(d.fast.rows[d.fast.shown-1])||{},sc=(rw.A&&rw.A.ok)||(rw.B&&rw.B.ok),bad=(rw.A&&!rw.A.ok)||(rw.B&&!rw.B.ok);   // a reveal: ding for points, buzzer for "not on the board"
+      if(sc)snd('ding');if(bad)setTimeout(function(){snd('buzzer')},sc?450:0)}
     if(d.fast.awarded&&!p.fast.awarded){snd('fanfare');setTimeout(function(){snd('applause')},250)}}
   if(p&&p.timerRunning&&!d.timerRunning&&d.timerSeconds===0)snd('timeup')}
 function soundForLive(p,d){

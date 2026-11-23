@@ -111,6 +111,14 @@ The projector then shows who buzzed first with the buzz-in sound, that team is *
 **Fallback:** if a phone fails, press "Team A first" or "Team B first" on the tech console or the emcee page: it does the same thing by
 hand. "Reset" closes the buzzers. This needs the self-hosted server.
 
+### Sai Five (the last round) on the day
+One question at a time on the tech laptop. For the question on screen, click the board answer **each team said**. If a team said
+something that is **not on the board**, click **✕ Not on the board** (type what they said first and press Enter, and the projector shows it
+with a red ✕ and 0 points; leave it empty to just show "Not on the board"). Click an answer again to clear it. Then press **Reveal
+answers** (or **R**): the projector shows both teams' answers and points for that question, with a ding for points and a buzzer for a wrong
+answer. Nothing is shown before you reveal, and later questions stay hidden. **Next question** moves on, the small numbered buttons jump
+anywhere, and after the fifth reveal **Award Sai Five points** adds the totals (points are 2× the board points). Every step can be undone.
+
 ### Answers and points when you tabulate
 The bank's sample answers for a question are its **primary answers (anchors)**, each with the points you gave it ("answer | points").
 When you group the audience's answers (standard grouping or ✨ AI), each one is first tried against the anchors; what fits joins that

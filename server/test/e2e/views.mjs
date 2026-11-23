@@ -367,6 +367,41 @@ check('PROJECTOR override: blank screen', await waitFn(proj, () => document.getE
 await tech.select('#projPanel [data-proj]', '');
 check('PROJECTOR back to the game automatically', await waitFn(proj, () => document.querySelectorAll('.a').length === 5));
 
+/* ---------- Sai Five: click what each team said, "not on the board" for a wrong answer, reveal, next, award ---------- */
+await tech.evaluate(() => window.__console.setView('fast'));
+await tech.waitForSelector('.sf-card', { timeout: 8000 });
+check('SAI FIVE tech: one question at a time with a button per board answer for each team', await tech.evaluate(() => document.querySelectorAll('.sf-col').length === 2 && document.querySelectorAll('.sf-col')[0].querySelectorAll('[data-fq-pick]').length >= 5));
+check('SAI FIVE projector shows the Sai Five board with nothing revealed yet', await waitFn(proj, () => document.querySelectorAll('.sfr').length === 5 && document.querySelectorAll('.sfr.cur .sfc.hid').length === 2), await text(proj));
+const first = await tech.evaluate(() => document.querySelector('[data-fq-pick="A:0"] span').textContent);
+const firstPts = await tech.evaluate(() => Number(document.querySelector('[data-fq-pick="A:0"] b').textContent));
+await tc(tech, '[data-fq-pick="A:0"]');
+await tech.type('[data-fq-said="B"]', 'moneybags'); await tech.keyboard.press('Enter');
+check('SAI FIVE tech shows each team\'s pick (a board answer / not on the board)', await waitFn(tech, () => /moneybags/.test(document.querySelectorAll('.sf-now')[1].textContent) && document.querySelectorAll('.sf-now')[0].classList.contains('ok')), await text(tech));
+check('SAI FIVE the projector reveals nothing until you press Reveal', await proj.evaluate(() => document.querySelectorAll('.sfc.ok,.sfc.bad').length === 0));
+const dBefore = await count('ding'), bBefore = await count('buzzer');
+await tc(tech, '[data-fq-reveal]');
+check('SAI FIVE reveal: a right answer shows its text and points on the projector', await waitFn(proj, (t) => { const c = document.querySelector('.sfr.cur .sfc.ok'); return !!c && c.textContent.includes(t); }, first), await text(proj));
+check('SAI FIVE reveal: a wrong answer shows ✕ and what was said, 0 points', await waitFn(proj, () => { const c = document.querySelector('.sfr.cur .sfc.bad'); return !!c && c.textContent.includes('moneybags') && c.textContent.includes('✕'); }), await text(proj));
+check('SAI FIVE projector plays a ding for the points and a buzzer for the wrong answer', await waitFn(proj, (a) => window.__played.filter((x) => x[0] === 'ding').length > a[0] && window.__played.filter((x) => x[0] === 'buzzer').length > a[1], [dBefore, bBefore]));
+check('SAI FIVE totals: only the revealed points', await waitFn(proj, (p) => document.querySelectorAll('.sftot b')[0].textContent === String(p) && document.querySelectorAll('.sftot b')[1].textContent === '0', firstPts), await text(proj));
+check('SAI FIVE emcee sees what each team said', await waitText(emcee, /moneybags/), waitText.last);
+await tc(tech, '[data-undo]');
+check('SAI FIVE Undo takes the reveal back (projector hides the row again)', await waitFn(proj, () => document.querySelectorAll('.sfc.ok,.sfc.bad').length === 0));
+await tc(tech, '[data-redo]');
+await waitFn(proj, () => document.querySelectorAll('.sfc.ok').length === 1);
+for (let k = 1; k < 5; k++) {
+  await tc(tech, k === 1 ? '[data-fq-go="1"]' : `[data-fq-go="${k}"]`);
+  await tc(tech, '[data-fq-pick="A:1"]'); await tc(tech, '[data-fq-pick="B:2"]'); await tc(tech, '[data-fq-reveal]');
+}
+check('SAI FIVE all five revealed, then Award is offered', await tech.evaluate(() => !!document.querySelector('[data-fast-award]:not([disabled])') && document.querySelector('.sf-pills .done') !== null));
+await snap(proj, 'sf1-projector-board'); await snap(tech, 'sf2-tech');
+await tc(tech, 'main [data-fast-award], .sf-bar [data-fast-award]');
+check('SAI FIVE award: final result banner on the projector', await waitText(proj, /FINAL RESULT/), waitText.last);
+await tc(tech, '[data-undo]');
+check('SAI FIVE Undo of the award removes the banner', await waitFn(proj, () => !/FINAL RESULT/.test(document.body.innerText)));
+await tech.evaluate(() => window.__console.setView('rounds', 0));
+await waitFn(proj, () => document.querySelectorAll('.a').length === 5);
+
 /* ---------- connections: a second tech console is flagged, and a closed projector is noticed ---------- */
 const svId = await tech.evaluate(() => window.__console.A.sv.id);
 const tech2 = await ctxPage(1000, 700);
