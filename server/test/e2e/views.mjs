@@ -224,6 +224,13 @@ check('...and turns it back on', await waitFn(proj, () => Sound.state().mute ===
 await proj.reload({ waitUntil: 'networkidle0' });
 await installRecorder(); await proj.click('#snd'); await sleep(900);
 check('a reloaded projector does not replay old soundboard cues', !(await played()).includes('drumroll'), await played());
+check('the built-in sounds are the default set', await proj.evaluate(() => Sound.state().pack === 'builtin'));
+await tech.select('[data-snd-pack]', 'classic');
+check('TECH can switch to the "Classic game show" set and the projector follows', await waitFn(proj, () => Sound.state().pack === 'classic'), await proj.evaluate(() => Sound.state().pack));
+check('...and it explains when no files have been added yet', await waitFn(tech, () => /No files in sounds\/classic\//.test(document.querySelector('[data-pack-note]').textContent)));
+check('...sounds still play (missing files fall back to the built-in ones)', await proj.evaluate(() => Sound.play('ding') === true));
+await tech.select('[data-snd-pack]', '');
+check('TECH can switch back to the built-in sounds', await waitFn(proj, () => Sound.state().pack === 'builtin'));
 
 /* ---------- projector override ---------- */
 await tech.select('#projPanel [data-proj]', 'intermission');

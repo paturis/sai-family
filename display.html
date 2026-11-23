@@ -464,7 +464,7 @@ function soundForLive(p,d){
   if(p&&d.mode!=='buzzer'){
     if(d.phase==='open'&&(p.phase!=='open'||p.q!==d.q))snd('sting');
     if(p.phase==='open'&&d.phase==='closed'&&p.q===d.q)snd('timeup')}
-  if(d.snd&&window.Sound){Sound.setMuted(!!d.snd.mute);if(typeof d.snd.vol==='number')Sound.setVolume(d.snd.vol)}
+  if(d.snd&&window.Sound){Sound.setMuted(!!d.snd.mute);if(typeof d.snd.vol==='number')Sound.setVolume(d.snd.vol);Sound.setPack(d.snd.pack||'builtin')}
   // a cue from the tech's soundboard (cues already in the document when this page opens are not replayed)
   if(!cueSeen){cueSeen=true;lastCue=d.cue&&d.cue.id}
   else if(d.cue&&d.cue.id!==lastCue){lastCue=d.cue.id;if(d.cue.name==='stop'){if(window.Sound)Sound.stop()}else snd(d.cue.name)}}
@@ -477,7 +477,7 @@ function kiosk(){
   var sb=document.getElementById('snd');
   function showSnd(){var s=window.Sound?Sound.state():null;if(!s||!sb)return;
     if(!s.unlocked){sb.className='snd';sb.textContent='🔊 Click here once to turn the sound on';return}
-    sb.className='snd on';sb.textContent=s.mute?'🔇 Sound is muted from the tech laptop':'🔊 Sound on'+(s.files.length?' · your files: '+s.files.join(', '):'')}
+    sb.className='snd on';sb.textContent=s.mute?'🔇 Sound is muted from the tech laptop':'🔊 Sound on'+(s.pack!=='builtin'?' · '+s.pack+' set ('+s.packFiles.length+' files)':'')+(s.files.length?' · your files: '+s.files.join(', '):'')}
   function unlockSound(){if(!window.Sound)return;var first=!Sound.state().unlocked;Sound.unlock();if(first){Sound.loadFiles('sounds/');snd('ding')}showSnd()}
   if(window.Sound){Sound.onState(showSnd);['pointerdown','keydown'].forEach(function(ev){document.addEventListener(ev,unlockSound)})}
   var hint=document.createElement('div');hint.className='hint';hint.textContent='Press F for full screen';document.body.appendChild(hint);

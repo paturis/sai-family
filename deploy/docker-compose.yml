@@ -3,7 +3,7 @@
 #   docker compose up -d --build
 #
 # The app listens on port 8080 INSIDE the container and serves everything (pages, API and the /ws WebSocket).
-# Expose it with your own Caddy setup: add your labels / network / ports below (examples at the bottom).
+# It is exposed at https://gameshow.sathyasai.org by the caddy-docker-proxy labels and the shared "caddy" network below.
 services:
   app:
     build:
@@ -32,17 +32,16 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    # ---- add your own exposure here, e.g. for caddy-docker-proxy: ----
-    # networks: [caddy]
-    # labels:
-    #   caddy: game.example.org
-    #   caddy.reverse_proxy: "{{upstreams 8080}}"
-    # ---- or, for a Caddy on the host: ----
-    # ports: ["127.0.0.1:8080:8080"]
+    # ---- exposed through the existing caddy-docker-proxy ----
+    networks: [caddy]
+    labels:
+      caddy: gameshow.sathyasai.org
+      caddy.reverse_proxy: "{{upstreams 8080}}"
+    # (Caddy on the host instead? Remove the networks and labels above and publish a port: ports: ["127.0.0.1:8080:8080"])
 
 volumes:
   gameshow-data:
 
-# networks:
-#   caddy:
-#     external: true
+networks:
+  caddy:
+    external: true       # the network your caddy-docker-proxy is on (check with: docker network ls)

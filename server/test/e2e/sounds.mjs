@@ -40,6 +40,8 @@ fs.writeFileSync(path.join(tmp, 'index.html'), '<html><body>x</body></html>');
 const sr0 = 22050, n0 = Math.floor(sr0 * 0.3), tone0 = new Float32Array(n0).map((_, i) => 0.5 * Math.sin(2 * Math.PI * 440 * i / sr0));
 fs.writeFileSync(path.join(tmp, 'sounds', 'buzzer.wav'), wav(Array.from(tone0), sr0));
 fs.writeFileSync(path.join(tmp, 'sounds', 'my-song.mp3'), 'not a built-in name');
+fs.mkdirSync(path.join(tmp, 'sounds', 'classic'));
+fs.writeFileSync(path.join(tmp, 'sounds', 'classic', 'ding.wav'), wav(Array.from(tone0).map((v) => v * 0.8), sr0));
 const app = await createApp({ dataDir: ':memory:', port: 0, host: '127.0.0.1', publicUrl: 'http://127.0.0.1', webRoot: tmp });
 const base = `http://127.0.0.1:${await app.listen()}`;
 const p2 = await browser.newPage();
@@ -49,6 +51,23 @@ const loaded = await p2.evaluate(async () => { Sound.unlock(); const f = await S
 const own = JSON.stringify(loaded.f) === '["buzzer"]' && loaded.played === true;
 if (!own) fails++;
 console.log(`${own ? 'PASS' : 'FAIL'}  your own buzzer.wav is found, decoded and used  ${JSON.stringify(loaded)}`);
+const pk = await p2.evaluate(async () => {
+  const before = Sound.state().pack, avail = Sound.state().packs;
+  await Sound.setPack('classic');
+  const s1 = Sound.state(), ding = Sound.play('ding'), fallback = Sound.play('applause');   // 'applause' is not in the set: built-in is used
+  await Sound.setPack('builtin');
+  return { before, avail, pack: s1.pack, packFiles: s1.packFiles, ding, fallback, after: Sound.state().pack };
+});
+const packOk = pk.before === 'builtin' && pk.avail.includes('classic') && pk.pack === 'classic' && JSON.stringify(pk.packFiles) === '["ding"]' && pk.ding === true && pk.fallback === true && pk.after === 'builtin';
+if (!packOk) fails++;
+console.log(`${packOk ? 'PASS' : 'FAIL'}  sound set: built-in by default, "classic" loads its files, missing sounds fall back, can switch back  ${JSON.stringify(pk)}`);
+// choosing a set BEFORE the sound is switched on (projector reload) is applied once it is
+const p3 = await browser.newPage();
+await p3.goto(base + '/index.html'); await p3.addScriptTag({ url: base + '/sound.js' });
+const early = await p3.evaluate(async () => { Sound.setPack('classic'); const first = Sound.state().pack; Sound.unlock(); await Sound.loadFiles('sounds/'); return { first, later: Sound.state().pack, packFiles: Sound.state().packFiles }; });
+const earlyOk = early.first === 'builtin' && early.later === 'classic' && JSON.stringify(early.packFiles) === '["ding"]';
+if (!earlyOk) fails++;
+console.log(`${earlyOk ? 'PASS' : 'FAIL'}  a set chosen before the sound is on is applied as soon as it is  ${JSON.stringify(early)}`);
 await app.close(); fs.rmSync(tmp, { recursive: true, force: true });
 await browser.close();
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

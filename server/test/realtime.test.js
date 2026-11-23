@@ -220,6 +220,12 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
   fs.writeFileSync(path.join(dir, 'sounds', 'intro.wav'), Buffer.alloc(3 * 1024 * 1024, 7));
   fs.writeFileSync(path.join(dir, 'sounds', 'Bad Name.mp3'), 'x');
   fs.writeFileSync(path.join(dir, 'sounds', 'notes.txt'), 'x');
+  fs.mkdirSync(path.join(dir, 'sounds', 'classic'));
+  fs.writeFileSync(path.join(dir, 'sounds', 'classic', 'ding.mp3'), 'DING');
+  fs.writeFileSync(path.join(dir, 'sounds', 'classic', 'README.txt'), 'x');
+  fs.mkdirSync(path.join(dir, 'sounds', 'Not_A_Pack'));
+  fs.mkdirSync(path.join(dir, 'sounds', 'classic', 'deep'));
+  fs.writeFileSync(path.join(dir, 'sounds', 'classic', 'deep', 'x.mp3'), 'x');
   const s = await startApp({ webRoot: dir });
   try {
     const get = async (p) => fetch(s.base + p);
@@ -264,6 +270,15 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
     assert.equal((await fetch(s.base + '/sounds/intro.wav', { method: 'HEAD' })).status, 200);
     assert.equal((await get('/sounds/notes.txt')).status, 404);
     assert.deepEqual((await (await get('/sounds/index.json')).json()).files, ['buzzer.mp3', 'intro.wav'], 'lists only well-named audio files');
+    const idx = await (await get('/sounds/index.json')).json();
+    assert.deepEqual(idx.packs, { classic: ['ding.mp3'] }, 'sub-folders are sound sets; only well-named audio is listed');
+    const cd = await get('/sounds/classic/ding.mp3');
+    assert.equal(cd.status, 200);
+    assert.equal(cd.headers.get('content-type'), 'audio/mpeg');
+    assert.equal(await cd.text(), 'DING');
+    assert.equal((await get('/sounds/classic/..%2fbuzzer.mp3')).status, 404);
+    assert.equal((await get('/sounds/classic/deep/x.mp3')).status, 404, 'only one level of sound sets');
+    assert.equal((await get('/sounds/classic/README.txt')).status, 404);
     assert.equal((await get('/sounds/..%2findex.html')).status, 404);
     assert.equal((await get('/sounds/%2e%2e%2findex.html')).status, 404);
 

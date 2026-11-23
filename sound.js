@@ -6,7 +6,8 @@
   'use strict';
   var NAMES = ['intro', 'ding', 'buzzer', 'fanfare', 'applause', 'drumroll', 'tick', 'timeup', 'sting', 'steal', 'fastmoney', 'thinking'];
   var ctx = null, bus = null, files = {}, thinkTimer = null, loopSrc = null, listeners = [];
-  var state = { vol: 0.85, mute: false, unlocked: false, files: [] };
+  var packFiles = {}, avail = {}, want = 'builtin', loadedIndex = false;
+  var state = { vol: 0.85, mute: false, unlocked: false, files: [], pack: 'builtin' };
 
   function notify() { listeners.slice().forEach(function (f) { try { f(api.state()); } catch (e) { /* ignore */ } }); }
 
@@ -161,7 +162,8 @@
       if (c.state !== 'running') { try { c.resume(); } catch (e) { /* ignore */ } }
       var t = c.currentTime + 0.03;
       if (name === 'thinking') { api.stop(); loop(); return true; }
-      if (files[name]) { playFile(c, name, false); return true; }
+      var buf = pick(name);
+      if (buf) { playFile(c, buf, false); return true; }
       if (S[name]) { S[name](c, bus['in'], t); return true; }
       return false;
     },
@@ -176,20 +178,29 @@
     },
     setVolume: function (v) { state.vol = Math.min(1, Math.max(0, Number(v) || 0)); if (bus) bus.master.gain.value = state.mute ? 0 : state.vol; notify(); },
     setMuted: function (m) { state.mute = !!m; if (bus) bus.master.gain.value = state.mute ? 0 : state.vol; notify(); },
-    state: function () { return { vol: state.vol, mute: state.mute, unlocked: state.unlocked, files: state.files.slice() }; },
+    state: function () { return { vol: state.vol, mute: state.mute, unlocked: state.unlocked, files: state.files.slice(), pack: state.pack, packFiles: Object.keys(packFiles[state.pack] || {}), packs: Object.keys(avail) }; },
+    /** choose a sound set: 'builtin' (the default) or a folder under sounds/ such as 'classic'. Names missing from a set fall back to the built-in sound. */
+    setPack: function (name) {
+      want = name || 'builtin';
+      if (want === 'builtin') { state.pack = 'builtin'; notify(); return Promise.resolve(); }
+      if (!loadedIndex) return Promise.resolve();   // applied as soon as the file list is known (after the sound is switched on)
+      return loadPack(want);
+    },
     onState: function (f) { listeners.push(f); },
     /** use the server's own files (sounds/<name>.mp3 etc.) in place of the built-in version, when they exist */
     loadFiles: function (base) {
       base = base || 'sounds/';
+      api._base = base;
       return fetch(base + 'index.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : { files: [] }; }).catch(function () { return { files: [] }; }).then(function (idx) {
         var c = ensure(); if (!c) return [];
+        avail = idx.packs || {}; loadedIndex = true;
         var jobs = (idx.files || []).filter(function (f) { return NAMES.indexOf(f.replace(/\.[^.]+$/, '')) >= 0; }).map(function (f) {
           var name = f.replace(/\.[^.]+$/, '');
           return fetch(base + f).then(function (r) { return r.arrayBuffer(); }).then(function (ab) {
             return new Promise(function (res, rej) { c.decodeAudioData(ab, res, rej); });
           }).then(function (buf) { files[name] = buf; return name; }).catch(function () { return null; });
         });
-        return Promise.all(jobs).then(function (done) { state.files = done.filter(Boolean); notify(); return state.files; });
+        return Promise.all(jobs).then(function (done) { state.files = done.filter(Boolean); notify(); return want !== 'builtin' ? loadPack(want).then(function () { return state.files; }) : state.files; });
       });
     },
     /** for tests and for previewing: render a built-in sound offline and return its samples */
@@ -200,13 +211,25 @@
     }
   };
 
-  function playFile(c, name, loopIt) {
-    var s = c.createBufferSource(); s.buffer = files[name]; s.loop = !!loopIt; s.connect(bus['in']); s.start();
+  /** the file to use for a sound: the chosen set's file, else your own replacement file, else null (built-in) */
+  function pick(name) { var p = state.pack !== 'builtin' && packFiles[state.pack]; return (p && p[name]) || files[name] || null; }
+  function loadPack(name) {
+    var c = ensure(); if (!c) return Promise.resolve();
+    var list = (avail[name] || []).filter(function (f) { return NAMES.indexOf(f.replace(/\.[^.]+$/, '')) >= 0; }), got = {};
+    return Promise.all(list.map(function (f) {
+      return fetch((api._base || 'sounds/') + name + '/' + f).then(function (r) { return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (res, rej) { c.decodeAudioData(ab, res, rej); }); })
+        .then(function (buf) { got[f.replace(/\.[^.]+$/, '')] = buf; }).catch(function () { /* skip a file that will not decode */ });
+    })).then(function () { if (want === name) { packFiles[name] = got; state.pack = name; notify(); } });
+  }
+  function playFile(c, buf, loopIt) {
+    var s = c.createBufferSource(); s.buffer = buf; s.loop = !!loopIt; s.connect(bus['in']); s.start();
     if (loopIt) loopSrc = s;
   }
   function loop() {
     var c = ctx;
-    if (files.thinking) { playFile(c, 'thinking', true); return; }
+    var tb = pick('thinking');
+    if (tb) { playFile(c, tb, true); return; }
     var run = function () { S.thinking(c, bus['in'], c.currentTime + 0.05); };
     run(); thinkTimer = setInterval(run, 3950);
   }

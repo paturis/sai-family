@@ -1097,12 +1097,15 @@ function aiHealthMaybe(){if(Cloud.mode!=='server'||!['dash','tabulate','survey']
   Cloud.aiHealth().then(h=>{A.aiHealth=h;paint()}).catch(e=>{A.aiHealth={ok:false,error:e.message};paint()})}
 /* ---------- sound: the tech triggers, the PROJECTOR laptop (on the hall speakers) plays ---------- */
 const CUES=[['ding','🔔 Ding'],['buzzer','🚫 Buzzer'],['applause','👏 Applause'],['drumroll','🥁 Drum roll'],['fanfare','🎺 Fanfare'],['intro','🎵 Intro music'],['thinking','🎧 Thinking music'],['stop','⏹ Stop sound']];
-const soundBox=()=>`<div class="snd-box"><div class="field-label">Sound — plays on the projector laptop</div><div class="snd-row"><label class="chk"><input type="checkbox" data-snd-on checked> Sound on</label><input type="range" min="0" max="100" value="85" data-snd-vol aria-label="Volume"></div><div class="soundboard">${CUES.map(c=>`<button class="btn small" data-cue="${c[0]}">${c[1]}</button>`).join('')}</div><div class="tiny">Reveals, strikes, awards, timers and the intro play by themselves. These buttons add extras. The projector laptop must be clicked once to switch its sound on.</div></div>`;
+const soundBox=()=>`<div class="snd-box"><div class="field-label">Sound — plays on the projector laptop</div><div class="snd-pack"><select data-snd-pack aria-label="Sound set"><option value="">Built-in sounds (default)</option><option value="classic">Classic game show (your own files)</option></select><div class="tiny" data-pack-note></div></div><div class="snd-row"><label class="chk"><input type="checkbox" data-snd-on checked> Sound on</label><input type="range" min="0" max="100" value="85" data-snd-vol aria-label="Volume"></div><div class="soundboard">${CUES.map(c=>`<button class="btn small" data-cue="${c[0]}">${c[1]}</button>`).join('')}</div><div class="tiny">Reveals, strikes, awards, timers and the intro play by themselves. These buttons add extras. The projector laptop must be clicked once to switch its sound on.</div></div>`;
+function packNote(el){const sel=el.querySelector('[data-snd-pack]'),n=el.querySelector('[data-pack-note]');if(!sel||!n)return;const k=sel.value;
+  if(!k){n.textContent='Original sounds made by the app. This is the default.';return}
+  const f=(A.soundPacks&&A.soundPacks[k])||[];n.textContent=f.length?f.length+' of 12 sounds found in sounds/'+k+'/ — any missing one uses the built-in sound.':'No files in sounds/'+k+'/ yet, so the built-in sounds are used. Add your own files there (see sounds/'+k+'/README.txt).'}
 async function sendCue(name){const code=A.sv&&A.sv.code;if(!code)return;
   try{await Cloud.liveUpdate(code,{cue:{id:Date.now()+'-'+Math.random().toString(36).slice(2,6),name}});if(name!=='stop')toast('Sent to the projector: '+((CUES.find(c=>c[0]===name)||[])[1]||name))}catch(e){toast('Could not send: '+(e.message||e))}}
 async function sendSnd(el){const code=A.sv&&A.sv.code;if(!code)return;
-  const on=el.querySelector('[data-snd-on]').checked,vol=Number(el.querySelector('[data-snd-vol]').value)/100;
-  try{await Cloud.liveUpdate(code,{snd:{mute:!on,vol}})}catch(e){toast('Could not change the volume: '+(e.message||e))}}
+  const on=el.querySelector('[data-snd-on]').checked,vol=Number(el.querySelector('[data-snd-vol]').value)/100,pack=el.querySelector('[data-snd-pack]').value||'builtin';
+  try{await Cloud.liveUpdate(code,{snd:{mute:!on,vol,pack}})}catch(e){toast('Could not change the volume: '+(e.message||e))}}
 /* ---------- projector: what the hall sees, an override, and a live preview ---------- */
 const PROJ_MODES=[['','Automatic'],['intermission','Intermission'],['blank','Blank screen']];
 function projectorNow(){if(A.projShow==='blank')return 'Blank screen';if(A.projShow==='intermission')return 'Intermission';
@@ -1128,7 +1131,9 @@ function renderProjPanel(){const el=document.getElementById('projPanel');if(!el)
   el.querySelectorAll('[data-cue]').forEach(b=>{b.onclick=()=>sendCue(b.dataset.cue)});
   el.querySelector('[data-snd-on]').onchange=()=>sendSnd(el);
   el.querySelector('[data-snd-vol]').onchange=()=>sendSnd(el);
-  Cloud.liveGet(code).then(l=>{if(l&&l.snd){const on=el.querySelector('[data-snd-on]'),v=el.querySelector('[data-snd-vol]');if(on)on.checked=!l.snd.mute;if(v&&typeof l.snd.vol==='number')v.value=Math.round(l.snd.vol*100)}A.projShow=(l&&l.show)||'';el.querySelectorAll('[data-proj]').forEach(x=>{x.value=A.projShow});const st=el.querySelector('[data-proj-now]');if(st)st.textContent=projectorNow()}).catch(()=>{});
+  el.querySelector('[data-snd-pack]').onchange=()=>{packNote(el);sendSnd(el)};
+  fetch('sounds/index.json',{cache:'no-store'}).then(r=>r.ok?r.json():{packs:{}}).catch(()=>({packs:{}})).then(ix=>{A.soundPacks=ix.packs||{};const sel=el.querySelector('[data-snd-pack]');Object.keys(A.soundPacks).filter(k=>k!=='classic').forEach(k=>{if(!sel.querySelector('option[value="'+k+'"]')){const o=document.createElement('option');o.value=k;o.textContent=k+' (your files)';sel.appendChild(o)}});if(A.pendingPack)sel.value=A.pendingPack;packNote(el)});
+  Cloud.liveGet(code).then(l=>{if(l&&l.snd){const on=el.querySelector('[data-snd-on]'),v=el.querySelector('[data-snd-vol]');if(on)on.checked=!l.snd.mute;if(v&&typeof l.snd.vol==='number')v.value=Math.round(l.snd.vol*100);const ps=el.querySelector('[data-snd-pack]');if(ps&&l.snd.pack&&l.snd.pack!=='builtin'){A.pendingPack=l.snd.pack;ps.value=l.snd.pack;packNote(el)}}A.projShow=(l&&l.show)||'';el.querySelectorAll('[data-proj]').forEach(x=>{x.value=A.projShow});const st=el.querySelector('[data-proj-now]');if(st)st.textContent=projectorNow()}).catch(()=>{});
   el.querySelector('[data-projprev]').onclick=()=>{A.projPrev=!prev;try{localStorage.setItem('sfeud_projprev',A.projPrev?'1':'0')}catch(e){}renderProjPanel()}}
 /* live count of audience phones and answers so far (self-hosted server only) */
 function ensureStats(){const code=Cloud.mode==='server'&&A.sv&&A.sv.code;

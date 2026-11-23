@@ -371,3 +371,6 @@ body.presentation .side{display:none}
 .r0.stage .r0-chip.ok{background:rgba(79,182,176,.22);border-color:rgba(143,216,210,.6);color:#c3f1ec}
 .r0.stage .r0-chip.bad{background:rgba(255,138,128,.2);border-color:rgba(255,138,128,.7);color:#ffc9c4}
 .r0.stage .r0-chip.warn{background:rgba(245,160,77,.22);border-color:rgba(245,160,77,.7);color:#ffd9ae}
+
+.snd-pack{margin:4px 0 10px}
+.snd-pack .tiny{margin-top:6px}

@@ -31,7 +31,7 @@ const MIME = {
   '.m4a': 'audio/mp4',
 };
 // Only these file names are served from the web folder (no dotfiles, no rules/config of other stacks).
-const STATIC_OK = /^(?:(?:fonts|sounds)\/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(html|js|css|png|svg|ico|woff2|mp3|ogg|wav|m4a)$/;
+const STATIC_OK = /^(?:(?:fonts|sounds)\/|sounds\/[a-z0-9_-]+\/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(html|js|css|png|svg|ico|woff2|mp3|ogg|wav|m4a)$/;
 const SOUND_FILE = /^[a-z0-9_-]+\.(mp3|ogg|wav|m4a)$/;
 const BIG_FILE = 2 * 1024 * 1024; // larger files (music) are streamed, not kept in memory
 const SECURITY_HEADERS = {
@@ -222,9 +222,15 @@ export async function createApp(overrides = {}) {
       }
       if (p.startsWith('/api/')) return await api(req, res, p);
       if (p === '/sounds/index.json') { // which of your own sound files are installed (the projector asks once)
-        let files = [];
-        try { files = fs.readdirSync(path.join(config.webRoot, 'sounds')).filter((f) => SOUND_FILE.test(f)).sort(); } catch { /* no folder */ }
-        return json(res, 200, { files });
+        const files = [], packs = {}; // files: your replacements for the built-in sounds; packs: whole alternative sets (sub-folders)
+        try {
+          const dir = path.join(config.webRoot, 'sounds');
+          for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (e.isFile() && SOUND_FILE.test(e.name)) files.push(e.name);
+            else if (e.isDirectory() && /^[a-z0-9_-]+$/.test(e.name)) packs[e.name] = fs.readdirSync(path.join(dir, e.name)).filter((f) => SOUND_FILE.test(f)).sort();
+          }
+        } catch { /* no sounds folder */ }
+        return json(res, 200, { files: files.sort(), packs });
       }
       if (p === '/backend-config.js') return send(res, 200, 'window.BACKEND="server";', { 'Content-Type': MIME['.js'] });
       return serveStatic(req, res, p);

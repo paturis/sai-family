@@ -24,5 +24,8 @@ How they are picked up: the projector laptop loads this folder when you click "t
 file, reload the projector page. With Docker, either rebuild the image (docker compose up -d --build) or, to skip rebuilding,
 uncomment the "../sounds:/app/web/sounds:ro" line in deploy/docker-compose.yml and restart.
 
+A WHOLE ALTERNATIVE SET: put files in a sub-folder (for example sounds/classic/, see its README.txt). The tech picks the set in the
+Sound box of the projector panel; the built-in sounds stay the default. Names missing from a set use the built-in sound.
+
 Please only use sounds you have the right to use. The built-in sounds are original, but recordings from TV game shows,
 films or commercial music are copyrighted.

@@ -10,7 +10,7 @@ phones / projector / tech laptop  ──https──►  your Caddy  ──►  s
 
 ## First-time setup (about 10 minutes)
 
-1. **DNS:** point a name (e.g. `game.example.org`) at the VPS.
+1. **DNS:** point `gameshow.sathyasai.org` at the VPS.
 2. **Get the code** on the VPS and go to `deploy/`:
    ```bash
    git clone -b self-hosted git@github.com:paturis/sai-family.git && cd sai-family/deploy
@@ -25,10 +25,9 @@ phones / projector / tech laptop  ──https──►  your Caddy  ──►  s
    docker compose up -d --build
    docker compose logs -f app     # expect:  [server] listening …   and   [ai] self-test: ready (…)
    ```
-5. **Expose it through your Caddy.** The app listens on port 8080 inside its container and serves everything (pages, API and the
-   `/ws` WebSocket; Caddy's `reverse_proxy` handles WebSockets by default). Add whatever your setup needs to the `app` service in
-   `docker-compose.yml` (labels, a network, or a published port: examples are at the bottom of the file), then `docker compose up -d`.
-   The address you expose must match `PUBLIC_URL` in `.env`.
+5. **It is exposed through your caddy-docker-proxy** by the labels and the `caddy` network already in `docker-compose.yml`
+   (`gameshow.sathyasai.org`, WebSockets included). If your Caddy's Docker network is not called `caddy`, change it in the `networks:` block
+   (`docker network ls` shows the name). `PUBLIC_URL` in `.env` must match: `https://gameshow.sathyasai.org`.
 6. **Your login link:**
    ```bash
    docker compose exec app node src/cli.js login-link <the name in ADMIN_IDS>
@@ -81,6 +80,12 @@ out, a steal alert, and an intro jingle when the game begins. Undoing something 
 The tech has a **soundboard** in the Projector panel (ding, buzzer, applause, drum roll, fanfare, intro music, looping "thinking"
 music, stop) with a volume slider and a sound on/off switch. They only send a cue; the projector laptop plays it.
 
+**Sound sets.** The built-in sounds are always the default. The tech can switch to an alternative set in the Sound box of the Projector
+panel: "Classic game show (your own files)" uses whatever you put in `sounds/classic/` (names in `sounds/classic/README.txt`), and any
+sound missing from that folder still uses the built-in one. Those files are deliberately **not** in this repository, and git ignores audio
+in that folder, because recordings of the TV show are copyrighted and the repository is public. Copy them straight onto the server
+(`sai-family/sounds/classic/`), then rebuild (`docker compose up -d --build`) or use the bind mount in `docker-compose.yml`, and reload the projector page.
+
 All sounds are original and made in the browser, so nothing needs downloading. To use **your own sounds or music** put files such as
 `buzzer.mp3` or `intro.mp3` in the `sounds/` folder (names and formats in `sounds/README.txt`), rebuild or bind-mount it (see the
 comment in `docker-compose.yml`), and reload the projector page. Only use audio you have the right to use: recordings from TV
@@ -101,7 +106,7 @@ last action plus a list of recent ones. **X** adds a strike and **Shift+X** remo
 - **Load test** (from your laptop, 400 simulated phones):
   ```bash
   docker compose exec app node src/cli.js add-user loadtest admin     # copy the token after ?login=
-  cd ../server && npm install && node loadtest/phones.js --url https://game.example.org --token <token> --phones 400
+  cd ../server && npm install && node loadtest/phones.js --url https://gameshow.sathyasai.org --token <token> --phones 400
   docker compose exec app node src/cli.js remove-user loadtest
   ```
   Expect `PASS`. Run it while your other services are busy to see the real picture on a shared VPS.

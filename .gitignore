@@ -6,3 +6,9 @@ server/data/
 *.db-shm
 .DS_Store
 backups/
+
+# Sound sets you supply yourself (recordings you have the right to use). Keep audio files OUT of the public repository.
+sounds/classic/*.mp3
+sounds/classic/*.ogg
+sounds/classic/*.wav
+sounds/classic/*.m4a
