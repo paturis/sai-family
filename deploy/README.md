@@ -112,12 +112,19 @@ The projector then shows who buzzed first with the buzz-in sound, that team is *
 hand. "Reset" closes the buzzers. This needs the self-hosted server.
 
 ### Sai Five (the last round) on the day
-One question at a time on the tech laptop. For the question on screen, click the board answer **each team said**. If a team said
-something that is **not on the board**, click **✕ Not on the board** (type what they said first and press Enter, and the projector shows it
-with a red ✕ and 0 points; leave it empty to just show "Not on the board"). Click an answer again to clear it. Then press **Reveal
-answers** (or **R**): the projector shows both teams' answers and points for that question, with a ding for points and a buzzer for a wrong
-answer. Nothing is shown before you reveal, and later questions stay hidden. **Next question** moves on, the small numbered buttons jump
-anywhere, and after the fifth reveal **Award Sai Five points** adds the totals (points are 2× the board points). Every step can be undone.
+**One team answers each question first** (Team A on question 1, Team B on question 2, and so on; "⇄ Swap who goes first" changes it for
+one question). The **clock and its buttons are at the top of the page** (first-team seconds and steal seconds are editable there; the
+defaults are 30 and 15).
+1. Press **Start 30s**. When the team answers, click the board answer they said. If it is **not on the board**, click **✕ Not on the
+   board** (type what they said first and press Enter if you want the projector to show it). Press **Reveal** (or **R**): the projector
+   shows the answer and points with a ding, or a red ✕ with a buzzer.
+2. **If the first team was wrong** (or ran out of time), the projector shows "⚡ STEAL — Team B answers the same question · 15 seconds"
+   with a steal sound, and the tech's clock is set to the steal time. Press **Start 15s**, click what Team B said, **Reveal**.
+3. **If the first team was right** the question is finished; the other team's cell shows "—". (Tick "Both teams always answer" to
+   switch the steal rule off.)
+4. **Next question**; the small numbered buttons jump anywhere. After question 5, **Award Sai Five points** (points are 2× the board
+   points). Nothing is shown on the projector before you reveal it, later questions stay hidden, and every step can be undone.
+Pictures: `docs/screens/sai-five-*.png`.
 
 ### Answers and points when you tabulate
 The bank's sample answers for a question are its **primary answers (anchors)**, each with the points you gave it ("answer | points").

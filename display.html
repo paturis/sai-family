@@ -51,6 +51,8 @@ html,body{background:radial-gradient(ellipse 90% 60% at 50% -10%,var(--navy-600)
 .sfc{display:flex;flex-direction:column;position:relative;padding:.8vh 1vw;border-radius:1vh;background:rgba(255,255,255,.08);min-height:7vh;justify-content:center}
 .sfc small{font:700 clamp(10px,.9vw,15px) var(--font);letter-spacing:.14em;text-transform:uppercase;opacity:.75}
 .sfc b{font-size:clamp(16px,1.9vw,30px)}.sfc i{position:absolute;right:.8vw;top:50%;transform:translateY(-50%);font:800 clamp(22px,2.6vw,42px)/1 var(--font-head);font-style:normal}
+.sfturn{margin:1.2vh auto 0;width:max-content;max-width:90%;padding:.9vh 2vw;border-radius:99px;background:rgba(255,255,255,.12);font:800 clamp(16px,1.9vw,30px) var(--font);letter-spacing:.06em;text-transform:uppercase;text-align:center}.sfturn.steal{background:#c0392b}
+.sfc.skip{opacity:.4}
 .sfc.ok{background:#1f6b36}.sfc.bad{background:#7d2118}.sfc.hid b{opacity:.5}
 .sftot{display:flex;justify-content:center;gap:6vw;margin-top:2vh;font-size:clamp(20px,2.4vw,40px);font-weight:700}.sftot b{color:var(--orange-on-dark);margin-left:.5vw}
 .fq{display:flex;gap:1.4vw;padding:1.6vh 1vw;border-top:1px solid rgba(255,255,255,.14);align-items:baseline}
@@ -423,9 +425,11 @@ function drawGame(){
     var F=D.fast;
     var cell=function(r,k){var c=r[k],nm=esc(t[k].name);
       if(!c)return '<div class="sfc hid"><small>'+nm+'</small><b>• • •</b></div>';
+      if(c.skip)return '<div class="sfc skip"><small>'+nm+'</small><b>—</b></div>';
       if(c.ok)return '<div class="sfc ok"><small>'+nm+'</small><b>'+esc(c.t)+'</b><i>'+c.p+'</i></div>';
       return '<div class="sfc bad"><small>'+nm+'</small><b>✕ '+esc(c.t||(c.none?'No answer':'Not on the board'))+'</b><i>0</i></div>'};
-    h+='<div class="cat">⚡ SAI FIVE · '+F.n+' QUESTIONS · 2× POINTS</div><div class="sf">'+F.rows.map(function(r,i){
+    var tn=F.turn;
+    h+='<div class="cat">⚡ SAI FIVE · '+F.n+' QUESTIONS · 2× POINTS</div>'+(tn?'<div class="sfturn'+(tn.steal?' steal':'')+'">'+(tn.steal?'⚡ STEAL — ':'')+esc(t[tn.team].name)+' answers'+(tn.steal?' the same question':'')+' · '+tn.secs+' seconds</div>':'')+'<div class="sf">'+F.rows.map(function(r,i){
       if(!r.q)return '<div class="sfr dim"><span class="no">'+(i+1)+'</span><div class="sq">• • •</div></div>';
       return '<div class="sfr'+(i===F.q?' cur':'')+'"><span class="no">'+(i+1)+'</span><div class="sq">'+esc(r.q)+'</div>'+cell(r,'A')+cell(r,'B')+'</div>'}).join('')+'</div>'+
       '<div class="sftot"><div>'+esc(t.A.name)+' <b>'+F.totals.A+'</b></div><div>'+esc(t.B.name)+' <b>'+F.totals.B+'</b></div></div>';
@@ -513,8 +517,10 @@ function soundForDoc(p,d){
   }else if(nr&&pr)snd('sting');
   if(p&&d.view==='fast'&&p.view!=='fast')snd('saifive');
   if(p&&p.fast&&d.fast){
-    if(d.fast.shown>p.fast.shown){var rw=(d.fast.rows[d.fast.shown-1])||{},sc=(rw.A&&rw.A.ok)||(rw.B&&rw.B.ok),bad=(rw.A&&!rw.A.ok)||(rw.B&&!rw.B.ok);   // a reveal: ding for points, buzzer for "not on the board"
-      if(sc)snd('ding');if(bad)setTimeout(function(){snd('buzzer')},sc?450:0)}
+    var sc=false,bad=false;   // a reveal: ding for points, buzzer for "not on the board" or no answer
+    (d.fast.rows||[]).forEach(function(r,i){var pr=(p.fast.rows||[])[i]||{};['A','B'].forEach(function(k){if(r[k]&&!r[k].skip&&!pr[k]){if(r[k].ok)sc=true;else bad=true}})});
+    if(sc)snd('ding');if(bad)setTimeout(function(){snd('buzzer')},sc?450:0);
+    if(d.fast.turn&&d.fast.turn.steal&&!(p.fast.turn&&p.fast.turn.steal))setTimeout(function(){snd('steal')},bad?900:300)
     if(d.fast.awarded&&!p.fast.awarded){snd('fanfare');setTimeout(function(){snd('applause')},250)}}
   if(p&&p.timerRunning&&!d.timerRunning&&d.timerSeconds===0)snd('timeup')}
 function soundForLive(p,d){

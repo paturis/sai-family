@@ -367,35 +367,43 @@ check('PROJECTOR override: blank screen', await waitFn(proj, () => document.getE
 await tech.select('#projPanel [data-proj]', '');
 check('PROJECTOR back to the game automatically', await waitFn(proj, () => document.querySelectorAll('.a').length === 5));
 
-/* ---------- Sai Five: click what each team said, "not on the board" for a wrong answer, reveal, next, award ---------- */
+/* ---------- Sai Five: first team answers; a wrong answer gives the other team the SAME question in less time (steal) ---------- */
 await tech.evaluate(() => window.__console.setView('fast'));
 await tech.waitForSelector('.sf-card', { timeout: 8000 });
-check('SAI FIVE tech: one question at a time with a button per board answer for each team', await tech.evaluate(() => document.querySelectorAll('.sf-col').length === 2 && document.querySelectorAll('.sf-col')[0].querySelectorAll('[data-fq-pick]').length >= 5));
-check('SAI FIVE projector shows the Sai Five board with nothing revealed yet', await waitFn(proj, () => document.querySelectorAll('.sfr').length === 5 && document.querySelectorAll('.sfr.cur .sfc.hid').length === 2), await text(proj));
-const first = await tech.evaluate(() => document.querySelector('[data-fq-pick="A:0"] span').textContent);
-const firstPts = await tech.evaluate(() => Number(document.querySelector('[data-fq-pick="A:0"] b').textContent));
-await tc(tech, '[data-fq-pick="A:0"]');
-await tech.type('[data-fq-said="B"]', 'moneybags'); await tech.keyboard.press('Enter');
-check('SAI FIVE tech shows each team\'s pick (a board answer / not on the board)', await waitFn(tech, () => /moneybags/.test(document.querySelectorAll('.sf-now')[1].textContent) && document.querySelectorAll('.sf-now')[0].classList.contains('ok')), await text(tech));
-check('SAI FIVE the projector reveals nothing until you press Reveal', await proj.evaluate(() => document.querySelectorAll('.sfc.ok,.sfc.bad').length === 0));
-const dBefore = await count('ding'), bBefore = await count('buzzer');
+check('SAI FIVE tech: the clock and its buttons are at the TOP of the page, before the question', await tech.evaluate(() => { const bar = document.querySelector('.sf-timerbar'), card = document.querySelector('.sf-card'); return !!bar && !!bar.querySelector('#timerNum') && !!bar.querySelector('[data-sf-timer="start"]') && !!bar.querySelector('[data-sf-secs="first"]') && !!bar.querySelector('[data-sf-secs="second"]') && bar.getBoundingClientRect().top < card.getBoundingClientRect().top; }));
+check('SAI FIVE tech: Team A answers first on question 1; Team B waits (steal)', await tech.evaluate(() => /Team A answers/i.test(document.querySelector('.sf-turn').textContent) && document.querySelectorAll('.sf-col')[1].classList.contains('wait') && document.querySelector('[data-fq-pick="B:0"]').disabled));
+check('SAI FIVE projector: Team A answers · 30 seconds, nothing revealed', await waitFn(proj, () => /Team A answers · 30 seconds/i.test((document.querySelector('.sfturn') || {}).textContent || '') && document.querySelectorAll('.sfc.ok,.sfc.bad').length === 0), await text(proj));
+const dBefore = await count('ding'), bBefore = await count('buzzer'), sBefore = await count('steal');
+await tech.type('[data-fq-said="A"]', 'moneybags'); await tech.keyboard.press('Enter');
+check('SAI FIVE tech shows "not on the board" for what Team A said', await waitFn(tech, () => /moneybags/.test(document.querySelectorAll('.sf-now')[0].textContent) && document.querySelectorAll('.sf-now')[0].classList.contains('bad')));
+check('SAI FIVE projector reveals nothing until you press Reveal', await proj.evaluate(() => document.querySelectorAll('.sfc.ok,.sfc.bad').length === 0));
 await tc(tech, '[data-fq-reveal]');
-check('SAI FIVE reveal: a right answer shows its text and points on the projector', await waitFn(proj, (t) => { const c = document.querySelector('.sfr.cur .sfc.ok'); return !!c && c.textContent.includes(t); }, first), await text(proj));
-check('SAI FIVE reveal: a wrong answer shows ✕ and what was said, 0 points', await waitFn(proj, () => { const c = document.querySelector('.sfr.cur .sfc.bad'); return !!c && c.textContent.includes('moneybags') && c.textContent.includes('✕'); }), await text(proj));
-check('SAI FIVE projector plays a ding for the points and a buzzer for the wrong answer', await waitFn(proj, (a) => window.__played.filter((x) => x[0] === 'ding').length > a[0] && window.__played.filter((x) => x[0] === 'buzzer').length > a[1], [dBefore, bBefore]));
-check('SAI FIVE totals: only the revealed points', await waitFn(proj, (p) => document.querySelectorAll('.sftot b')[0].textContent === String(p) && document.querySelectorAll('.sftot b')[1].textContent === '0', firstPts), await text(proj));
+check('SAI FIVE reveal: wrong answer shows ✕ and what was said, 0 points, buzzer', await waitFn(proj, () => { const c = document.querySelector('.sfr.cur .sfc.bad'); return !!c && c.textContent.includes('moneybags'); }) && await waitFn(proj, (n) => window.__played.filter((x) => x[0] === 'buzzer').length > n, bBefore));
+check('SAI FIVE projector: STEAL — Team B answers the same question · 15 seconds (+ steal sound)', await waitFn(proj, () => /STEAL — Team B answers the same question · 15 seconds/i.test((document.querySelector('.sfturn.steal') || {}).textContent || '')) && await waitFn(proj, (n) => window.__played.filter((x) => x[0] === 'steal').length > n, sBefore), await text(proj));
+check('SAI FIVE tech: Team B is now up, the clock is ready at 15s, Team B buttons are live', await tech.evaluate(() => /STEAL/i.test(document.querySelector('.sf-turn').textContent) && document.getElementById('timerNum').textContent === '15s' && !document.querySelector('[data-fq-pick="B:0"]').disabled));
+await tech.evaluate(() => window.scrollTo(0, 0)); await sleep(200); await snap(tech, 'sf0-tech-steal-turn'); await snap(proj, 'sf0-projector-steal-turn');
+await tc(tech, '[data-sf-timer="start"]');
+check('SAI FIVE the tech\'s clock runs and the projector shows it counting', await waitFn(tech, () => window.__console && document.getElementById('timerNum').textContent !== '15s') && await waitFn(proj, () => !!document.getElementById('tm')), await text(proj));
+await tc(tech, '[data-sf-timer="toggle"]');
+const firstText = await tech.evaluate(() => document.querySelector('[data-fq-pick="B:0"] span').textContent), firstPts = await tech.evaluate(() => Number(document.querySelector('[data-fq-pick="B:0"] b').textContent));
+await tc(tech, '[data-fq-pick="B:0"]');
+await tc(tech, '[data-fq-reveal]');
+check('SAI FIVE steal answered: Team B\'s right answer shows with points and a ding', await waitFn(proj, (t) => { const c = document.querySelector('.sfr.cur .sfc.ok'); return !!c && c.textContent.includes(t); }, firstText) && await waitFn(proj, (n) => window.__played.filter((x) => x[0] === 'ding').length > n, dBefore), await text(proj));
+check('SAI FIVE totals: only revealed points (Team B has the steal points)', await waitFn(proj, (p) => document.querySelectorAll('.sftot b')[1].textContent === String(p) && document.querySelectorAll('.sftot b')[0].textContent === '0', firstPts), await text(proj));
+await snap(proj, 'sf1-projector-steal'); await snap(tech, 'sf2-tech-steal');
 check('SAI FIVE emcee sees what each team said', await waitText(emcee, /moneybags/), waitText.last);
-await tc(tech, '[data-undo]');
-check('SAI FIVE Undo takes the reveal back (projector hides the row again)', await waitFn(proj, () => document.querySelectorAll('.sfc.ok,.sfc.bad').length === 0));
-await tc(tech, '[data-redo]');
-await waitFn(proj, () => document.querySelectorAll('.sfc.ok').length === 1);
-for (let k = 1; k < 5; k++) {
-  await tc(tech, k === 1 ? '[data-fq-go="1"]' : `[data-fq-go="${k}"]`);
-  await tc(tech, '[data-fq-pick="A:1"]'); await tc(tech, '[data-fq-pick="B:2"]'); await tc(tech, '[data-fq-reveal]');
-}
-check('SAI FIVE all five revealed, then Award is offered', await tech.evaluate(() => !!document.querySelector('[data-fast-award]:not([disabled])') && document.querySelector('.sf-pills .done') !== null));
-await snap(proj, 'sf1-projector-board'); await snap(tech, 'sf2-tech');
-await tc(tech, 'main [data-fast-award], .sf-bar [data-fast-award]');
+await tc(tech, '[data-fq-go="1"]');
+check('SAI FIVE question 2: Team B answers first (they alternate) and the clock is back to 30s', await tech.evaluate(() => /Team B answers/i.test(document.querySelector('.sf-turn').textContent) && document.getElementById('timerNum').textContent === '30s'));
+await tc(tech, '[data-fq-pick="B:1"]'); await tc(tech, '[data-fq-reveal]');
+check('SAI FIVE a right first answer ends the question: the other team shows "—" and does not answer', await waitFn(proj, () => !!document.querySelector('.sfr.cur .sfc.skip')) && await tech.evaluate(() => !!document.querySelector('[data-fq-go="2"]') && document.querySelector('.sf-col.wait') !== null));
+await tc(tech, '[data-sf-mode]');
+check('SAI FIVE option "both teams always answer" gives the other team a turn after all', await waitFn(tech, () => /Team A answers/i.test(document.querySelector('.sf-turn').textContent) && !document.querySelector('[data-fq-pick="A:1"]').disabled));
+await tc(tech, '[data-sf-mode]');
+await tc(tech, '[data-undo]'); await tc(tech, '[data-undo]');
+for (let k = 2; k < 5; k++) { await tc(tech, `[data-fq-go="${k}"]`); await tc(tech, `[data-fq-pick="${k % 2 ? 'B' : 'A'}:1"]`); await tc(tech, '[data-fq-reveal]'); }
+await tc(tech, '[data-fq-go="1"]'); await tc(tech, '[data-fq-pick="B:1"]'); await tc(tech, '[data-fq-reveal]');
+await tc(tech, '[data-fq-go="4"]');
+await tc(tech, '.sf-bar [data-fast-award]');
 check('SAI FIVE award: final result banner on the projector', await waitText(proj, /FINAL RESULT/), waitText.last);
 await tc(tech, '[data-undo]');
 check('SAI FIVE Undo of the award removes the banner', await waitFn(proj, () => !/FINAL RESULT/.test(document.body.innerText)));

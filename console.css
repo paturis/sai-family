@@ -399,3 +399,12 @@ body.presentation .side{display:none}
 .sf-bar{display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
 .sf-tot{margin-left:auto;font-size:15px;color:#cfdde4}.sf-tot b{color:#fff;font-size:20px;margin:0 4px}
 .sf-bar kbd{margin-left:6px;padding:0 6px;border-radius:4px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.3);font-size:12px}
+.sf-timerbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 26px;border-bottom:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18)}
+.sf-turn{font:800 15px var(--font,inherit);letter-spacing:.06em;text-transform:uppercase;color:#fff;padding:7px 12px;border-radius:9px;background:rgba(255,255,255,.1)}
+.sf-turn.steal{background:#c0392b}
+.sf-timerbar .timer{font:800 38px/1 var(--font-head,inherit);min-width:84px;text-align:center}
+.sf-set{font-size:13px;color:#cfdde4;display:inline-flex;align-items:center;gap:6px}.sf-set input[type=number]{width:56px;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.28);background:rgba(0,0,0,.25);color:#fff;font:inherit}
+.sf-set.chk{margin-left:auto}
+.sf-col h3 em{display:block;margin-top:2px;font:700 11px var(--font,inherit);letter-spacing:.1em;color:#cfdde4;font-style:normal;text-transform:none}
+.sf-col.turn{outline:2px solid var(--orange,#e67e17);outline-offset:6px;border-radius:10px}.sf-col.wait{opacity:.55}
+.sf-q .btn.small{float:right;margin-left:10px}
