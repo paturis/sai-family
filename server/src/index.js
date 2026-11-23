@@ -64,7 +64,7 @@ export async function createApp(overrides = {}) {
     const q = l && Number.isInteger(l.q) ? l.q : -1;
     const devices = hub.count('live:' + code, { audienceOnly: true });
     // who is connected right now, by role. Screens announce themselves with a "hello"; phones are counted by what they watch.
-    const presence = { audience: devices, projector: 0, emcee: 0, tech: 0 };
+    const presence = { audience: devices, projector: 0, emcee: 0, tech: 0, buzzA: 0, buzzB: 0 };
     for (const ws of wss.clients) if (ws.readyState === 1 && ws.presence && ws.presence.code === code) presence[ws.presence.role]++;
     return { q, count: q >= 0 ? store.answers.count(code, q) : 0, devices, presence };
   };
@@ -77,7 +77,7 @@ export async function createApp(overrides = {}) {
     t.unref?.();
     statsTimers.set(code, t);
   };
-  const store = createStore({ db, hub, closeGraceMs: config.closeGraceMs, answerGraceMs: config.answerGraceMs, onEvent: (kind, code) => statsSoon(code) });
+  const store = createStore({ db, hub, closeGraceMs: config.closeGraceMs, answerGraceMs: config.answerGraceMs, faceoffHoldMs: overrides.faceoffHoldMs, onEvent: (kind, code) => statsSoon(code) });
   hub.onChange = (ch) => { if (ch.startsWith('live:')) statsSoon(ch.slice(5)); };
   const auth = createAuth({ db, config, secret });
   const ai = createAI({ config, store, db, fetchImpl: overrides.fetchImpl });
@@ -176,6 +176,13 @@ export async function createApp(overrides = {}) {
         if (!okCode(body.code)) throw new HttpError(400, 'bad_request', 'Bad code');
         store.answers.submit({ code: body.code, uid, q: body.q, a: body.a, buzz: p === '/api/buzz' });
         return json(res, 200, { ok: true }, setCookie ? { 'Set-Cookie': setCookie } : {});
+      }
+      case '/api/faceoff/buzz': {
+        const { uid, setCookie } = auth.audience(req);
+        if (!limiter(`fo:${uid}`, 40, 60_000)) throw new HttpError(429, 'rate_limited', 'Slow down');
+        if (!okCode(body.code)) throw new HttpError(400, 'bad_request', 'Bad code');
+        const r = store.faceoff.buzz(body.code, body.team);
+        return json(res, 200, { ok: true, ...r }, setCookie ? { 'Set-Cookie': setCookie } : {});
       }
       default:
         throw new HttpError(404, 'not_found', 'Unknown endpoint');
@@ -284,7 +291,7 @@ export async function createApp(overrides = {}) {
       try { m = JSON.parse(raw.toString()); } catch { return; }
       if (m.t === 'ping') return ws.send('{"t":"pong"}');
       if (m.t === 'hello') { // "I am the projector / an emcee / a tech console, watching this game"
-        if (okCode(m.code) && ['projector', 'emcee', 'tech'].includes(m.role)) { ws.presence = { code: m.code, role: m.role }; statsSoon(m.code); }
+        if (okCode(m.code) && ['projector', 'emcee', 'tech', 'buzzA', 'buzzB'].includes(m.role)) { ws.presence = { code: m.code, role: m.role }; statsSoon(m.code); }
         return;
       }
       if (m.t === 'sub') {

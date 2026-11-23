@@ -51,12 +51,18 @@ input{font:inherit;color:#fff}
 @media(prefers-reduced-motion:reduce){.live{animation:none}}
 
 .erow{display:flex;gap:14px;margin:14px 0 4px}
+.erow .btn{flex:1;padding:12px 10px;white-space:normal}
+.foqr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;text-align:center}
+.foqr b{display:block;font-size:14px;margin-bottom:6px}
+.foqr .qrbox{background:#fff;border-radius:10px;padding:8px}
+.foqr .qrbox svg{width:100%;height:auto;display:block}
+.foqr small{display:block;margin-top:4px;opacity:.8}
 .enum{flex:1;text-align:center;padding:12px 8px;border-radius:var(--r-lg);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14)}
 .enum b{display:block;font:700 44px/1 var(--font-head);color:var(--teal-on-dark);font-variant-numeric:tabular-nums}
 .enum.t b{color:var(--orange-on-dark)}
 .enum span{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#b9ccd5}
 </style>
-<script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script>
+<script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script><script src="qr.js"></script>
 <script>/* games.js - the game registry shared by the host console (index), the emcee view and the projector display.
    Every game is a plug-in with the SAME contract:
      id, label, icon, itemLabel, fields[], kinds[], defaults
@@ -374,7 +380,25 @@ function openShow(sv){
     state.poll=setInterval(function(){B.getSurvey(sv.id).then(function(x){if(x&&x.status==='ready')openShow(x)}).catch(function(){})},4000);
   }else{
     state.stage='game';draw();
+    if(sv.code&&B.watchLive)state.subs.push(B.watchLive(sv.code,function(l){state.L=l;draw()}));   // face-off buzzers
     state.unsub=B.watchGame(sv.id,function(g){state.S=g&&g.S||null;draw()})}}
+/* ---------- face-off: QR codes for the two team buzzer pages, and the buttons (server back end only) ---------- */
+var qrCache={};
+function buzzUrl(t){var u=new URL('buzz.html',location.href);u.search='?code='+state.sv.code+'&team='+t;u.hash='';return u.toString()}
+function qrFor(t){var u=buzzUrl(t);if(!qrCache[u])qrCache[u]=window.qrSvgTag?window.qrSvgTag(u):'';return qrCache[u]}
+function foPanel(S){
+  if(window.BACKEND!=='server'||!state.sv||!state.sv.code||!B.faceoff)return '';
+  var f=state.L&&state.L.fo,s=f&&f.state,A=S.teams.A.name,Bt=S.teams.B.name;
+  var showQR=state.foQR==null?!f:state.foQR;
+  var st=s==='open'?'<div class="ok" style="background:#e3f3e5;color:#23622b">Buzzers are OPEN — first phone to buzz wins</div>'
+    :s==='won'?'<div class="ok">'+esc(f.names&&f.names[f.winner]||('Team '+f.winner))+' buzzed first'+(f.by==='host'?' (set by hand)':'')+'</div>'
+    :'<p class="small">Contestants scan their team\'s code once. Then press Open buzzers when the question is read.</p>';
+  return '<div class="card"><div class="cat">🔔 FACE-OFF BUZZERS</div>'+st+
+    '<div class="erow" style="gap:8px;margin-top:8px"><button class="btn" data-a="foopen">'+(s==='open'?'↻ Re-open':'🔔 Open buzzers')+'</button><button class="btn" data-a="foreset" '+(s==='open'||s==='won'?'':'disabled')+'>Reset</button></div>'+
+    '<div class="small" style="margin:10px 0 4px">If a phone fails, say who was first:</div>'+
+    '<div class="erow" style="gap:8px"><button class="btn" data-a="foset" data-t="A">'+esc(A)+' first</button><button class="btn" data-a="foset" data-t="B">'+esc(Bt)+' first</button></div>'+
+    '<button class="btn" data-a="foqr" style="margin-top:10px">'+(showQR?'Hide':'Show')+' team QR codes</button>'+
+    (showQR?'<div class="foqr">'+['A','B'].map(function(t){return '<div><b>'+esc(t==='A'?A:Bt)+'</b><div class="qrbox">'+qrFor(t)+'</div><small>Team '+t+' buzzer</small></div>'}).join('')+'</div>':'')+'</div>'}
 function game(){
   var S=state.S;
   if(S&&S.game&&window.GAMES&&GAMES[S.game])return '<div class="small" style="margin:0 2px 8px"><span class="live"></span>Live · '+esc(state.sv.name)+'</div>'+GAMES[S.game].host(S);
@@ -394,13 +418,16 @@ function game(){
       '<div class="strikes">'+[0,1,2].map(function(i){return '<i class="'+(i<rs.strikes?'on':'')+'">✕</i>'}).join('')+'</div>'+
       (rs.awarded?'<div class="ok">Round awarded to '+esc(S.teams[rs.awarded.team].name)+' (+'+rs.awarded.points+')</div>':'')+'</div>';
   }
-  return '<div class="small" style="margin:0 2px 8px"><span class="live"></span>Live · '+esc(state.sv.name)+'</div>'+h}
+  return '<div class="small" style="margin:0 2px 8px"><span class="live"></span>Live · '+esc(state.sv.name)+'</div>'+foPanel(S)+h}
 
 app.addEventListener('click',function(e){
   var b=e.target.closest('[data-a]');if(!b)return;var a=b.dataset.a;
   if(a==='mail'){var em=((document.getElementById('loginMail')||{}).value||'').trim();state.msg='';state.note='';if(!em){state.msg='Enter your email address.';draw();return}B.requestLink(em).then(function(){state.note='If that address is approved, a sign-in link is on its way. Check your inbox (and junk folder). It works once.';draw()},function(err){state.msg=String(err.message||err);draw()})}
   else if(a==='in')B.signIn((document.getElementById('loginTok')||{}).value).catch(function(err){state.msg='Sign-in failed: '+(err.message||err);draw()});
   else if(a==='out'){if(state.unsub)state.unsub();stopSurvey();B.signOut().then(function(){state.user=null;state.stage='login';state.sv=null;draw()})}
+  else if(a==='foopen'||a==='foreset'||a==='foset'){var S=state.S;if(!S||!S.teams)return;var nm={A:S.teams.A.name,B:S.teams.B.name};
+    B.faceoff(state.sv.code,a==='foopen'?'open':a==='foreset'?'reset':'set',b.dataset.t||null,nm).catch(function(err){alert('Could not do that: '+(err.message||err))})}
+  else if(a==='foqr'){var f0=state.L&&state.L.fo;state.foQR=!(state.foQR==null?!f0:state.foQR);draw()}
   else if(a==='refresh')loadList();
   else if(a==='back'){if(state.unsub)state.unsub();stopSurvey();state.sv=null;state.S=null;state.stage='list';loadList()}
   else if(a==='open'){var sv=state.surveys.filter(function(s){return s.id===b.dataset.id})[0];if(sv)openShow(sv)}
@@ -443,7 +470,8 @@ function serverBackend(){
     getSurvey:function(id){return C.rpc('getSurvey',id)},
     watchLive:function(code,cb){return C.subscribe('live:'+code,cb,{screen:true})},
     watchStats:function(code,cb){return C.subscribe('stats:'+code,cb,{screen:true})},
-    watchGame:function(id,cb){return C.subscribe('game:'+id,cb)}
+    watchGame:function(id,cb){return C.subscribe('game:'+id,cb)},
+    faceoff:function(code,action,arg,names){return C.rpc('faceoff',code,action,arg,names)}
   }}
 (async function(){
   draw();

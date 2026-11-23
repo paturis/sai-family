@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Face-off buzzer</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+html,body{height:100%;margin:0}
+body{background:#0d2d3d;color:#fff;font-family:var(--font,system-ui,sans-serif);-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#app{min-height:100%;display:flex;flex-direction:column;padding:18px;box-sizing:border-box}
+.top{display:flex;justify-content:space-between;align-items:center;font:800 13px/1 var(--font,inherit);letter-spacing:.18em;opacity:.85}
+.top b{padding:6px 12px;border-radius:999px;color:#0d2d3d}
+.top .A{background:#59b7e6}.top .B{background:#f5a447}
+.mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
+.mid h1{font:800 34px/1.15 var(--font-head,var(--font,inherit));margin:0}
+.mid p{margin:0;font-size:17px;opacity:.85}
+.pad{width:100%;flex:1;margin:18px 0 6px;min-height:55vh;border:0;border-radius:28px;font:800 clamp(48px,16vw,84px)/1 var(--font-head,var(--font,inherit));letter-spacing:.04em;color:#0d2d3d;cursor:pointer;box-shadow:0 10px 0 rgba(0,0,0,.35);transition:transform .05s}
+.pad:active{transform:translateY(8px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.pad.A{background:#59b7e6}.pad.B{background:#f5a447}
+.win{background:#2e9b4f;border-radius:28px;padding:30px 18px}
+.lose{background:rgba(255,255,255,.08);border-radius:28px;padding:30px 18px}
+.dim{opacity:.6}
+.tiny{font-size:12px;text-align:center;opacity:.6;padding-top:6px}
+</style>
+<script src="firebase-config.js"></script><script src="backend-config.js"></script><script src="server-client.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+var P=new URLSearchParams(location.search),app=document.getElementById('app');
+var code=(P.get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,''),team=(P.get('team')||'').toUpperCase();
+var fo=null,online=true,sent=null,state=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function name(k){return (fo&&fo.names&&fo.names[k])||('Team '+k)}
+function frame(inner){return '<div class="top"><span>FACE-OFF BUZZER</span><b class="'+team+'">TEAM '+team+' · '+esc(name(team))+'</b></div>'+inner+'<div class="tiny">'+(online?'Keep this page open':'⚠ Reconnecting… keep this page open')+'</div>'}
+function render(){
+  var s=fo&&fo.state;
+  if(window.BACKEND!=='server'){app.innerHTML=frame('<div class="mid"><h1>Not available</h1><p>The face-off buzzer needs the self-hosted server.</p></div>');return}
+  var key=[s,fo&&fo.id,fo&&fo.winner,online,sent].join('|');if(key===state)return;state=key;
+  if(s==='open'){
+    if(sent===fo.id){app.innerHTML=frame('<div class="mid"><h1>Buzzed…</h1><p>Waiting to see who was first</p></div>');return}
+    app.innerHTML=frame('<button class="pad '+team+'" id="pad">BUZZ!</button>');
+    var pad=document.getElementById('pad'),id=fo.id;
+    var fire=function(e){e.preventDefault();if(sent===id)return;sent=id;try{navigator.vibrate&&navigator.vibrate(60)}catch(x){}
+      window.SrvClient.post('/api/faceoff/buzz',{code:code,team:team}).catch(function(){sent=null;state=null;render()});state=null;render()};
+    pad.addEventListener('pointerdown',fire);
+  }else if(s==='won'){
+    var w=fo.winner,mine=w===team;
+    app.innerHTML=frame('<div class="mid">'+(mine?'<div class="win"><h1>YOU BUZZED FIRST!</h1><p>Give your answer to the host</p></div>':'<div class="lose"><h1>'+esc(name(w))+'</h1><p>buzzed first</p></div>')+'</div>');
+    try{if(mine&&navigator.vibrate)navigator.vibrate([120,60,120])}catch(x){}
+  }else{
+    app.innerHTML=frame('<div class="mid"><h1>Get ready</h1><p class="dim">The buzzer opens when the host says go</p></div>');
+  }
+}
+(function(){
+  if(!code||(team!=='A'&&team!=='B')){app.innerHTML='<div class="mid" style="min-height:90vh"><h1>Scan your team\'s QR code</h1><p>This page needs a game code and a team.</p></div>';return}
+  render();
+  if(window.BACKEND!=='server')return;
+  var C=window.SrvClient;
+  C.onStatus(function(s){online=s==='online';state=null;render()});
+  C.hello(code,'buzz'+team);
+  C.subscribe('live:'+code,function(d){var f=d&&d.fo||null;if(f&&f.id&&f.id!==(fo&&fo.id)&&f.state==='open'){try{navigator.vibrate&&navigator.vibrate(40)}catch(x){}}fo=f;render()},{screen:true});
+})();
+</script>
+</body>
+</html>

@@ -23,7 +23,7 @@ export const okCode = (c) => typeof c === 'string' && CODE_RE.test(c);
  *  - buzz order uses the SERVER clock, first buzz wins (a phone cannot forge a time);
  *  - questions close by themselves on the server when the countdown ends.
  */
-export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500, now = () => Date.now(), onEvent = null }) {
+export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500, faceoffHoldMs = 8000, now = () => Date.now(), onEvent = null }) {
   const cache = new Map();
   const S = (sql) => {
     let s = cache.get(sql);
@@ -211,10 +211,54 @@ export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500,
     },
   };
 
+  /* ---------- face-off buzzers: who answers first for control of the board ----------
+     State lives in the live document (live.fo) so every screen sees it. The first valid buzz wins because the
+     server handles buzzes one at a time; a phone can only flip "open" to "won", nothing else. */
+  const foTimers = new Map();
+  const foSet = (code, fo) => live.update(code, { fo });
+  const foOf = (code) => { const d = live.get(code); if (!d) throw new HttpError(404, 'not_found', 'Unknown code'); return d.fo || { id: '', state: 'idle' }; };
+  const teamOk = (t) => { if (t !== 'A' && t !== 'B') throw new HttpError(400, 'bad_request', 'Team must be A or B'); return t; };
+  const foHide = (code, id) => {
+    clearTimeout(foTimers.get(code));
+    const t = setTimeout(() => {
+      foTimers.delete(code);
+      const d = live.get(code);
+      if (d && d.fo && d.fo.id === id && d.fo.state === 'won') foSet(code, { ...d.fo, state: 'idle' });
+    }, faceoffHoldMs);
+    t.unref?.();
+    foTimers.set(code, t);
+  };
+  const faceoff = {
+    open: (code, names) => {
+      foOf(code);
+      const n = (x) => String(x == null ? '' : x).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 40);
+      clearTimeout(foTimers.get(code));
+      foSet(code, { id: crypto.randomBytes(5).toString('hex'), state: 'open', names: { A: n(names && names.A) || 'Team A', B: n(names && names.B) || 'Team B' }, at: now() });
+    },
+    /** A phone buzzes. Returns whether it won. */
+    buzz: (code, team) => {
+      teamOk(team);
+      const f = foOf(code);
+      if (f.state !== 'open') return { won: false, winner: f.winner || null };
+      foSet(code, { ...f, state: 'won', winner: team, by: 'phone', wonAt: now() });
+      foHide(code, f.id);
+      return { won: true, winner: team };
+    },
+    /** The fallback: the tech or emcee saw who was first and says so (works even if no buzzers were opened). */
+    set: (code, team, names) => {
+      teamOk(team);
+      const f = foOf(code);
+      const id = crypto.randomBytes(5).toString('hex');
+      foSet(code, { id, state: 'won', winner: team, by: 'host', wonAt: now(), names: f.names || (names && { A: String(names.A || 'Team A').slice(0, 40), B: String(names.B || 'Team B').slice(0, 40) }) || { A: 'Team A', B: 'Team B' } });
+      foHide(code, id);
+    },
+    reset: (code) => { const f = foOf(code); clearTimeout(foTimers.get(code)); foSet(code, { ...f, state: 'idle' }); },
+  };
+
   return {
-    users, questions, surveys, data, live, display, answers, tx,
+    users, questions, surveys, data, live, display, answers, faceoff, tx,
     /** After a restart: close questions whose time ran out, re-arm the rest. */
     rescheduleAll: () => { for (const r of S('SELECT code FROM live').all()) schedule(r.code); },
-    close: () => { for (const t of timers.values()) clearTimeout(t); timers.clear(); },
+    close: () => { for (const t of [...timers.values(), ...foTimers.values()]) clearTimeout(t); timers.clear(); foTimers.clear(); },
   };
 }

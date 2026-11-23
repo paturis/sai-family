@@ -91,6 +91,21 @@ All sounds are original and made in the browser, so nothing needs downloading. T
 comment in `docker-compose.yml`), and reload the projector page. Only use audio you have the right to use: recordings from TV
 game shows are copyrighted.
 
+**Sound is on by default.** The projector page tries to start sound the moment it opens and keeps retrying; any click or key press
+makes it permanent. If the "Click here once" button is still showing, the browser is blocking autoplay. To avoid the click for good,
+start the projector laptop's Chrome with `--autoplay-policy=no-user-gesture-required` (or allow Sound for the site in
+Chrome: Settings, Privacy and security, Site settings, Sound).
+
+### Face-off buzzers (who plays first)
+Before each round the two contestants decide who takes control. Each contestant opens their own team's buzzer page on their phone:
+the **emcee page shows two QR codes** (Team A and Team B; use "Show team QR codes") that open `buzz.html?code=…&team=A|B`. The tech
+console shows a green tick for each team's pad once it is connected. When the emcee has read the question, the **emcee or the tech
+presses "Open buzzers"**: the projector shows "BUZZERS OPEN!" with a sound, both pads turn into a big BUZZ button, and the first press
+wins (the server decides the order, so a slow connection cannot cheat). The projector shows who buzzed first with the buzz-in sound,
+that team is **put in control on the tech console automatically** (Undo changes it), and the screen clears itself after a few seconds.
+**Fallback:** if a phone fails, press "Team A first" or "Team B first" on the tech console or the emcee page: it does the same thing by
+hand. "Reset" closes the buzzers. This needs the self-hosted server.
+
 ### Taking mistakes back (tech)
 Everything the tech does on the board can be undone: reveals, hides, strikes, who has control, awarding a round (even to the wrong
 team), score corrections and Fast Money. **Z** or **Ctrl/⌘+Z** undoes the last action, **Shift+Z** redoes it, and the sidebar shows the

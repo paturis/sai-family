@@ -4,7 +4,7 @@
    Used by the projector page, which is the laptop connected to the hall speakers. */
 (function () {
   'use strict';
-  var NAMES = ['intro', 'ding', 'buzzer', 'fanfare', 'applause', 'drumroll', 'tick', 'timeup', 'sting', 'steal', 'fastmoney', 'thinking'];
+  var NAMES = ['intro', 'ding', 'buzzer', 'fanfare', 'applause', 'drumroll', 'tick', 'timeup', 'sting', 'steal', 'fastmoney', 'thinking', 'faceoff', 'buzzin'];
   var ctx = null, bus = null, files = {}, thinkTimer = null, loopSrc = null, listeners = [];
   var packFiles = {}, avail = {}, want = 'builtin', loadedIndex = false;
   var state = { vol: 0.85, mute: false, unlocked: false, files: [], pack: 'builtin' };
@@ -137,6 +137,20 @@
       for (var k = 0; k < 8; k++) { noise(c, o, t + k * beat, 0.09, 0.12, { freq: 5000, q: 0.5 }); tone(c, o, t + k * beat, 90, 0.12, 'sine', 0.3, { to: 45 }); }
       noise(c, o, t + 8 * beat, 1.4, 0.2, { type: 'highpass', freq: 3500, q: 0.3 });
     },
+    /* face-off: the buzzers are open — a quick two-note "ready!" */
+    faceoff: function (c, o, t) {
+      tone(c, o, t, hz('E5'), 0.14, 'square', 0.16, { lp: 2600 });
+      tone(c, o, t + 0.16, hz('A5'), 0.34, 'square', 0.18, { lp: 2800, release: 0.15 });
+      tone(c, o, t + 0.16, hz('A4'), 0.34, 'triangle', 0.16);
+    },
+    /* a team buzzed in: a sharp, loud buzz-in with a bell on top */
+    buzzin: function (c, o, t) {
+      tone(c, o, t, hz('A3'), 0.32, 'sawtooth', 0.3, { lp: 1800 });
+      tone(c, o, t, hz('A3') * 1.5, 0.32, 'square', 0.14, { lp: 1800 });
+      noise(c, o, t, 0.05, 0.25, { freq: 3000, q: 0.8 });
+      tone(c, o, t + 0.2, hz('E6'), 0.7, 'sine', 0.22, { release: 0.4 });
+      tone(c, o, t + 0.2, hz('E7'), 0.5, 'sine', 0.08, { release: 0.3 });
+    },
     /* soft "thinking" music: one 4-second pattern (repeated while it plays) */
     thinking: function (c, o, t) {
       var b = 0.5, ar = ['C4', 'G4', 'E4', 'G4', 'A3', 'E4', 'C4', 'E4'];
@@ -152,8 +166,13 @@
     unlock: function () {
       var c = ensure();
       if (!c) return 'unsupported';
-      try { if (c.state !== 'running') c.resume(); var b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); } catch (e) { /* ignore */ }
-      state.unlocked = true; notify();
+      var sync = function () { var on = c.state === 'running'; if (on !== state.unlocked) { state.unlocked = on; notify(); } };
+      try {
+        c.onstatechange = sync;
+        if (c.state !== 'running') { var p = c.resume(); if (p && p.then) p.then(sync, sync); }
+        var b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0);
+      } catch (e) { /* ignore */ }
+      sync();
       return c.state;
     },
     play: function (name) {

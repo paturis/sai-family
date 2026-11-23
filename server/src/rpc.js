@@ -93,6 +93,15 @@ export function createRpc({ store, auth, ai, mailer, config }) {
     /* live (phones) and display (projector) */
     codeFree: [STAFF, (user, c) => store.live.free(code(c))],
     liveSet: [STAFF, (user, c, o) => { store.live.set(code(c), obj(o)); return true; }],
+    // face-off buzzers: the tech or an emcee opens them, resets them, or names the winner by hand (the fallback)
+    faceoff: [ANY, (user, c, action, arg, names) => {
+      const k = code(c);
+      if (action === 'open') store.faceoff.open(k, obj(names || {}));
+      else if (action === 'reset') store.faceoff.reset(k);
+      else if (action === 'set') store.faceoff.set(k, str(arg, 1), obj(names || {}));
+      else throw new HttpError(400, 'bad_request', 'Unknown face-off action');
+      return true;
+    }],
     liveUpdate: [STAFF, (user, c, p) => { store.live.update(code(c), obj(p)); return true; }],
     liveGet: [ANY, (user, c) => store.live.get(code(c))],
     liveDelete: [STAFF, (user, c) => { store.live.remove(code(c)); return true; }],

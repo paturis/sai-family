@@ -39,7 +39,8 @@ async function waitFn(p, fn, arg, ms = 8000) {
   while (Date.now() - t0 < ms) { if (await p.evaluate(fn, arg)) return true; await sleep(120); }
   return false;
 }
-const tc = (p, sel) => p.click(sel);
+// a DOM click: the page may repaint between locating and clicking the element, which makes a real mouse click flaky
+const tc = async (p, sel) => { await p.waitForSelector(sel, { timeout: 15000 }); await p.evaluate((s) => document.querySelector(s).click(), sel); };
 const consoleHook = (p, fn, ...a) => p.evaluate(fn, ...a);
 
 /* simulated audience phones (their own cookies, like real devices) */
@@ -167,6 +168,36 @@ check('TECH sees the hidden answers dimmed with a lock', await tech.evaluate(() 
 check('TECH shows the projector panel with a live preview', await tech.evaluate(() => !!document.querySelector('#projPanel .proj-preview iframe') && !document.getElementById('projPanel').classList.contains('hidden')));
 const preview = tech.frames().find((f) => f.url().includes('display.html'));
 check('TECH projector preview is the real projector page showing the board', !!preview && await waitFn(preview, () => document.querySelectorAll('.a').length === 5, null, 8000));
+
+/* ---------- face-off buzzers: two team pads (own phones), emcee QR codes, projector overlay, control passes with Undo ---------- */
+const padA = await ctxPage(390, 800), padB = await ctxPage(390, 800);
+await padA.goto(`${base}/buzz.html?code=${code}&team=A`, { waitUntil: 'networkidle0' });
+await padB.goto(`${base}/buzz.html?code=${code}&team=B`, { waitUntil: 'networkidle0' });
+check('EMCEE shows a QR code for each team buzzer page', await waitFn(emcee, () => document.querySelectorAll('.foqr svg').length === 2), await text(emcee));
+check('TECH sees both team pads connected', await waitFn(tech, () => /✓[^✕]*pad[\s\S]*✓[^✕]*pad/.test(document.getElementById('sidebar').innerText) || document.querySelectorAll('#sidebar .r0-chip.ok').length >= 2));
+check('PAD shows "Get ready" before the buzzers open', await waitText(padA, /Get ready/), waitText.last);
+await tc(tech, '[data-fo="open"]');
+check('PROJECTOR shows "Buzzers open!"', await waitText(proj, /buzzers open!/i), waitText.last);
+check('PROJECTOR played the buzzers-open sound', (await played()).includes('faceoff'));
+await sleep(300); await snap(proj, 'fo1-projector-open'); await snap(emcee, 'fo1-emcee'); await snap(tech, 'fo1-tech');
+check('Both PADS show a BUZZ button', await waitFn(padA, () => !!document.getElementById('pad')) && await waitFn(padB, () => !!document.getElementById('pad')));
+check('EMCEE sees the buzzers are open', await waitText(emcee, /Buzzers are OPEN/), waitText.last);
+const ctlBefore = await tech.evaluate(() => window.__console && document.querySelector('[data-control].active') && document.querySelector('[data-control].active').dataset.control);
+await snap(padA, 'fo2-pad-open');
+await padB.click('#pad');
+check('PROJECTOR shows Team B buzzed first', await waitText(proj, /buzzed first!/) && /Team B|TEAM B/.test(await text(proj)), waitText.last);
+await sleep(300); await snap(proj, 'fo3-projector-won'); await snap(padB, 'fo3-pad-winner'); await snap(padA, 'fo3-pad-loser');
+check('PROJECTOR played the buzz-in sound', (await played()).includes('buzzin'));
+check('Winning PAD says YOU BUZZED FIRST', await waitText(padB, /YOU BUZZED FIRST/), waitText.last);
+check('Other PAD says the other team buzzed first', await waitText(padA, /buzzed first/) && !/YOU BUZZED/.test(await text(padA)), waitText.last);
+check('TECH gives Team B control automatically', await waitFn(tech, () => (document.querySelector('[data-control].active') || {}).dataset.control === 'B'), ctlBefore);
+check('TECH can Undo that (control goes back)', await (async () => { await tech.click('[data-undo]'); return waitFn(tech, (b) => (document.querySelector('[data-control].active') || {}).dataset.control === b, ctlBefore || 'A'); })());
+await tc(tech, '[data-fo="set"][data-t="A"]');
+check('Fallback: the tech names Team A by hand, projector shows it', await waitText(proj, /buzzed first!/), waitText.last);
+await tc(tech, '[data-fo="reset"]');
+check('Reset clears the projector overlay', await waitFn(proj, () => !document.getElementById('fo').classList.contains('on')));
+await padA.close(); await padB.close();
+
 
 /* ---------- running the board: reveal, strike, award, and take each one back ---------- */
 check('TECH header chips stay visible while running the game', await tech.evaluate(() => { const h = document.getElementById('connHdr'); return !h.classList.contains('hidden') && h.querySelectorAll('[data-conn]').length >= 3; }));

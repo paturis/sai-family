@@ -374,3 +374,5 @@ body.presentation .side{display:none}
 
 .snd-pack{margin:4px 0 10px}
 .snd-pack .tiny{margin-top:6px}
+
+.note-ok{margin:6px 0;padding:8px 10px;border-radius:8px;background:#e3f3e5;border:1px solid #a9d4ae;color:#23622b;font-size:13px;font-weight:600}

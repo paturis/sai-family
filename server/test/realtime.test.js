@@ -136,7 +136,7 @@ test('stats channel: live answer count and connected devices, public, throttled'
     const screen = await client(s.base).ws();
     sub(screen, 'stats:STAT1');
     await until(() => docs(screen, 'stats:STAT1').length >= 1);
-    assert.deepEqual(docs(screen, 'stats:STAT1')[0].data, { q: 2, count: 0, devices: 0, presence: { audience: 0, projector: 0, emcee: 0, tech: 0 } });
+    assert.deepEqual(docs(screen, 'stats:STAT1')[0].data, { q: 2, count: 0, devices: 0, presence: { audience: 0, projector: 0, emcee: 0, tech: 0, buzzA: 0, buzzB: 0 } });
 
     // 3 phones join: devices go up
     const phones = [];
@@ -173,7 +173,7 @@ test('presence: the tech can see the projector, emcees, other tech consoles and 
     const hello = (ws, role, code = 'PRES1') => ws.send(JSON.stringify({ t: 'hello', code, role }));
     const last = () => docs(watcher, 'stats:PRES1').at(-1).data.presence;
     await until(() => docs(watcher, 'stats:PRES1').length >= 1);
-    assert.deepEqual(last(), { audience: 0, projector: 0, emcee: 0, tech: 0 });
+    assert.deepEqual(last(), { audience: 0, projector: 0, emcee: 0, tech: 0, buzzA: 0, buzzB: 0 });
 
     const projector = await client(s.base).ws(); sub(projector, 'display:PRES1'); hello(projector, 'projector');
     await until(() => last().projector === 1);
@@ -183,7 +183,7 @@ test('presence: the tech can see the projector, emcees, other tech consoles and 
     const phones = [];
     for (let i = 0; i < 3; i++) { const p = await client(s.base).ws(); sub(p, 'live:PRES1'); phones.push(p); }
     await until(() => { const p = last(); return p.emcee === 2 && p.tech === 1 && p.audience === 3; });
-    assert.deepEqual(last(), { audience: 3, projector: 1, emcee: 2, tech: 1 });
+    assert.deepEqual(last(), { audience: 3, projector: 1, emcee: 2, tech: 1, buzzA: 0, buzzB: 0 });
 
     // a second tech console is visible (the game must only be run from one)
     const tech2 = await client(s.base).ws(); hello(tech2, 'tech');
@@ -199,7 +199,7 @@ test('presence: the tech can see the projector, emcees, other tech consoles and 
     hello(tech1, 'admin'); hello(tech1, 'tech', 'bad code'); tech1.send(JSON.stringify({ t: 'hello', code: 'PRES1' }));
     const other = await client(s.base).ws(); hello(other, 'projector', 'OTHER1');
     await wait(500);
-    assert.deepEqual(last(), { audience: 3, projector: 0, emcee: 1, tech: 2 });
+    assert.deepEqual(last(), { audience: 3, projector: 0, emcee: 1, tech: 2, buzzA: 0, buzzB: 0 });
     [watcher, emcee2, tech1, tech2, other, ...phones].forEach((w) => w.close());
   } finally { await s.close(); }
 });
@@ -288,5 +288,37 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
     assert.equal((await get('/%E0%A4%A')).status, 404, 'malformed escape');
     assert.equal((await get('/a/../../x.html')).status, 404);
     assert.equal((await get('/healthz')).status, 200, 'still alive');
+  } finally { await s.close(); }
+});
+
+test('face-off: first buzz wins, late buzz loses, host can set by hand, reset hides it', async () => {
+  const s = await startApp({ faceoffHoldMs: 150 });
+  try {
+    const tech = await login(s.app, s.base, 't', 'tech');
+    const host = await login(s.app, s.base, 'h', 'host');
+    const sid = s.app.store.surveys.create({ name: 'S', code: 'FOFOF' });
+    await tech.rpc('liveSet', 'FOFOF', { phase: 'done', stage: 'gate' });
+    const a = client(s.base), b = client(s.base);
+    assert.equal((await a.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'A' })).body.won, false, 'not open yet');
+    assert.equal((await host.rpc('faceoff', 'FOFOF', 'open', null, { A: 'Lions', B: 'Tigers' })).status, 200, 'an emcee may open the buzzers');
+    const live = () => s.app.store.live.get('FOFOF').fo;
+    assert.equal(live().state, 'open');
+    assert.deepEqual(live().names, { A: 'Lions', B: 'Tigers' });
+    const [ra, rb] = await Promise.all([a.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'B' }), b.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'A' })]);
+    assert.equal([ra, rb].filter((r) => r.body.won).length, 1, 'exactly one winner');
+    assert.equal(live().state, 'won');
+    assert.equal(live().by, 'phone');
+    assert.equal((await a.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'A' })).body.won, false);
+    assert.equal((await a.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'C' })).status, 400, 'bad team');
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(live().state, 'idle', 'the overlay clears itself');
+    assert.equal((await tech.rpc('faceoff', 'FOFOF', 'set', 'B')).status, 200);
+    assert.equal(live().winner, 'B'); assert.equal(live().by, 'host');
+    await tech.rpc('faceoff', 'FOFOF', 'reset');
+    assert.equal(live().state, 'idle');
+    assert.equal((await tech.rpc('faceoff', 'FOFOF', 'nope')).status, 400);
+    assert.equal((await client(s.base).rpc('faceoff', 'FOFOF', 'open')).status, 401, 'anonymous cannot open');
+    assert.equal(s.app.store.live.get('FOFOF').phase, 'done', 'the rest of the live document is untouched');
+    void sid;
   } finally { await s.close(); }
 });
