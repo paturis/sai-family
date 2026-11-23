@@ -176,7 +176,14 @@ await padB.goto(`${base}/buzz.html?code=${code}&team=B`, { waitUntil: 'networkid
 check('EMCEE shows a QR code for each team buzzer page', await waitFn(emcee, () => document.querySelectorAll('.foqr svg').length === 2), await text(emcee));
 check('TECH sees both team pads connected', await waitFn(tech, () => /✓[^✕]*pad[\s\S]*✓[^✕]*pad/.test(document.getElementById('sidebar').innerText) || document.querySelectorAll('#sidebar .r0-chip.ok').length >= 2));
 check('PAD shows "Get ready" before the buzzers open', await waitText(padA, /Get ready/), waitText.last);
+await tc(tech, '[data-fo="ready"]');
+check('PROJECTOR shows "Get ready" and no question', await waitFn(proj, () => /get ready/i.test(document.getElementById('fo').innerText) && !/Name something/.test(document.getElementById('fo').innerText)), await proj.evaluate(() => document.getElementById('fo').innerText));
+check('PADS show "Get ready…" and no buzz button yet', await waitText(padA, /Get ready…/) && await padA.evaluate(() => !document.getElementById('pad')), waitText.last);
+check('EMCEE sees the question hidden while the buzzers are only ready', await waitText(emcee, /Question hidden until you open the buzzers/), waitText.last);
+check('TECH shows READY with an Open button', await waitText(tech, /Buzzers READY/) && await tech.evaluate(() => !!document.querySelector('[data-fo="open"]')), waitText.last);
 await tc(tech, '[data-fo="open"]');
+check('PROJECTOR shows the question together with "Buzzers open!"', await waitFn(proj, () => /Name something/.test(document.getElementById('fo').innerText)), await proj.evaluate(() => document.getElementById('fo').innerText));
+check('EMCEE sees the question again once the buzzers are open', await waitText(emcee, /Name something/), waitText.last);
 check('PROJECTOR shows "Buzzers open!"', await waitText(proj, /buzzers open!/i), waitText.last);
 check('PROJECTOR played the buzzers-open sound', (await played()).includes('faceoff'));
 await sleep(300); await snap(proj, 'fo1-projector-open'); await snap(emcee, 'fo1-emcee'); await snap(tech, 'fo1-tech');

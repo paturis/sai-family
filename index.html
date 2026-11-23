@@ -315,7 +315,7 @@ function serverImpl(){
     async getBuzzes(code,q){return R('getBuzzes',code,q)},
     async getAnswers(code){return R('getAnswers',code)},
     async aiGroup(p){return R('aiGroup',p)},
-    async faceoff(code,action,arg,names){return R('faceoff',code,action,arg,names)},
+    async faceoff(code,action,arg,names,question){return R('faceoff',code,action,arg,names,question)},
     async aiHealth(force){return R('aiHealth',!!force)}
   };
 }
@@ -1161,12 +1161,13 @@ function onFo(f){const prev=A.fo;A.fo=f;
   if(A.stage==='off')renderSidebar()}
 function foBox(){if(Cloud.mode!=='server'||!A.sv||!A.sv.code)return '';
   const f=A.fo,s=f&&f.state,p=(A.stats&&A.stats.presence)||{},pad=(k,n)=>`<span class="r0-chip ${n?'ok':'warn'}" title="Has this team scanned its buzzer QR code?">${n?'✓':'✕'} ${esc(S.teams[k].name)} pad</span>`;
-  const st=s==='open'?'<div class="note-ok">🟢 Buzzers OPEN — first phone to buzz wins</div>':s==='won'?`<div class="note-ok">🏆 ${esc(foName(f.winner))} buzzed first${f.by==='host'?' (set by hand)':''}</div>`:'';
-  return `<div class="field-label">FACE-OFF BUZZERS</div>${st}<div class="control-row"><button class="btn gold" data-fo="open">${s==='open'?'↻ Re-open':'🔔 Open buzzers'}</button><button class="btn" data-fo="reset" ${s==='open'||s==='won'?'':'disabled'}>Reset</button></div>
+  const st=s==='ready'?'<div class="note-ok">🟡 Buzzers READY — the question is hidden. Press Open: the question appears on the projector and the emcee phone, and the buzzers go live at the same moment.</div>':s==='open'?'<div class="note-ok">🟢 Buzzers OPEN — first phone to buzz wins</div>':s==='won'?`<div class="note-ok">🏆 ${esc(foName(f.winner))} buzzed first${f.by==='host'?' (set by hand)':''}</div>`:'';
+  return `<div class="field-label">FACE-OFF BUZZERS</div>${st}<div class="control-row">${s==='ready'?'<button class="btn gold" data-fo="open">▶ Open buzzers &amp; show question</button>':s==='open'?'<button class="btn gold" data-fo="ready">↻ Ready again</button>':'<button class="btn gold" data-fo="ready">🔔 Get buzzers ready</button>'}<button class="btn" data-fo="reset" ${s==='ready'||s==='open'||s==='won'?'':'disabled'}>Reset</button></div>
   <div class="control-row"><button class="btn small" data-fo="set" data-t="A" title="Phone failed? Say who was first">${esc(S.teams.A.name)} first</button><button class="btn small" data-fo="set" data-t="B">${esc(S.teams.B.name)} first</button></div>
   <div class="control-row">${pad('A',p.buzzA)}${pad('B',p.buzzB)}</div>`}
 async function foAct(a,t){const code=A.sv&&A.sv.code;if(!code||Cloud.mode!=='server'){toast('Face-off buzzers need the self-hosted server');return}
-  try{await Cloud.faceoff(code,a==='open'?'open':a==='reset'?'reset':'set',t||null,{A:S.teams.A.name,B:S.teams.B.name})}catch(e){toast('Could not do that: '+(e.message||e))}}
+  const q=S.view==='rounds'&&S.data.rounds[S.round]?S.data.rounds[S.round].question.en:'';
+  try{await Cloud.faceoff(code,a==='open'?'open':a==='ready'?'ready':a==='reset'?'reset':'set',t||null,{A:S.teams.A.name,B:S.teams.B.name},q)}catch(e){toast('Could not do that: '+(e.message||e))}}
 window.foBox=foBox;window.foAct=foAct;
 /* who is connected right now: projector, emcees, audience phones, and a warning if two tech consoles are open */
 const CONN_KINDS=['projector','audience','emcee','tech'];

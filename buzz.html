@@ -50,6 +50,8 @@ function render(){
     var w=fo.winner,mine=w===team;
     app.innerHTML=frame('<div class="mid">'+(mine?'<div class="win"><h1>YOU BUZZED FIRST!</h1><p>Give your answer to the host</p></div>':'<div class="lose"><h1>'+esc(name(w))+'</h1><p>buzzed first</p></div>')+'</div>');
     try{if(mine&&navigator.vibrate)navigator.vibrate([120,60,120])}catch(x){}
+  }else if(s==='ready'){
+    app.innerHTML=frame('<div class="mid"><h1>Get ready…</h1><p>Your buzzer opens in a moment. Listen for the question.</p></div>');
   }else{
     app.innerHTML=frame('<div class="mid"><h1>Get ready</h1><p class="dim">The buzzer opens when the host says go</p></div>');
   }

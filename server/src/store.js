@@ -215,6 +215,7 @@ export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500,
      State lives in the live document (live.fo) so every screen sees it. The first valid buzz wins because the
      server handles buzzes one at a time; a phone can only flip "open" to "won", nothing else. */
   const foTimers = new Map();
+  const cleanNames = (names) => { const n = (x) => String(x == null ? '' : x).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 40); return { A: n(names && names.A) || 'Team A', B: n(names && names.B) || 'Team B' }; };
   const foSet = (code, fo) => live.update(code, { fo });
   const foOf = (code) => { const d = live.get(code); if (!d) throw new HttpError(404, 'not_found', 'Unknown code'); return d.fo || { id: '', state: 'idle' }; };
   const teamOk = (t) => { if (t !== 'A' && t !== 'B') throw new HttpError(400, 'bad_request', 'Team must be A or B'); return t; };
@@ -229,11 +230,18 @@ export function createStore({ db, hub, closeGraceMs = 500, answerGraceMs = 1500,
     foTimers.set(code, t);
   };
   const faceoff = {
-    open: (code, names) => {
+    /** Step 1: arm. Pads and projector show "get ready"; the question stays hidden; buzzes are ignored. */
+    ready: (code, names) => {
       foOf(code);
-      const n = (x) => String(x == null ? '' : x).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 40);
       clearTimeout(foTimers.get(code));
-      foSet(code, { id: crypto.randomBytes(5).toString('hex'), state: 'open', names: { A: n(names && names.A) || 'Team A', B: n(names && names.B) || 'Team B' }, at: now() });
+      foSet(code, { id: crypto.randomBytes(5).toString('hex'), state: 'ready', names: cleanNames(names), at: now() });
+    },
+    /** Step 2: buzzers go live and the question appears (projector + emcee) in the same instant, so reading it never races the buzzers. */
+    open: (code, names, question) => {
+      const f = foOf(code);
+      clearTimeout(foTimers.get(code));
+      const q = String(question == null ? '' : question).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 300);
+      foSet(code, { id: f.state === 'ready' ? f.id : crypto.randomBytes(5).toString('hex'), state: 'open', names: f.state === 'ready' && f.names ? f.names : cleanNames(names), q, at: now() });
     },
     /** A phone buzzes. Returns whether it won. */
     buzz: (code, team) => {

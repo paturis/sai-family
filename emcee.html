@@ -390,11 +390,11 @@ function foPanel(S){
   if(window.BACKEND!=='server'||!state.sv||!state.sv.code||!B.faceoff)return '';
   var f=state.L&&state.L.fo,s=f&&f.state,A=S.teams.A.name,Bt=S.teams.B.name;
   var showQR=state.foQR==null?!f:state.foQR;
-  var st=s==='open'?'<div class="ok" style="background:#e3f3e5;color:#23622b">Buzzers are OPEN — first phone to buzz wins</div>'
+  var st=s==='ready'?'<div class="ok" style="background:#fff3cd;color:#7a5a00">Buzzers READY. The question is hidden until you press Open. Then read it aloud.</div>':s==='open'?'<div class="ok" style="background:#e3f3e5;color:#23622b">Buzzers are OPEN — first phone to buzz wins</div>'
     :s==='won'?'<div class="ok">'+esc(f.names&&f.names[f.winner]||('Team '+f.winner))+' buzzed first'+(f.by==='host'?' (set by hand)':'')+'</div>'
-    :'<p class="small">Contestants scan their team\'s code once. Then press Open buzzers when the question is read.</p>';
+    :'<p class="small">Contestants scan their team\'s code once. Press Get buzzers ready, then Open buzzers: the question appears for you at that moment. Read it after that.</p>';
   return '<div class="card"><div class="cat">🔔 FACE-OFF BUZZERS</div>'+st+
-    '<div class="erow" style="gap:8px;margin-top:8px"><button class="btn" data-a="foopen">'+(s==='open'?'↻ Re-open':'🔔 Open buzzers')+'</button><button class="btn" data-a="foreset" '+(s==='open'||s==='won'?'':'disabled')+'>Reset</button></div>'+
+    '<div class="erow" style="gap:8px;margin-top:8px"><button class="btn" data-a="'+(s==='ready'?'foopen':'foready')+'">'+(s==='ready'?'▶ Open buzzers &amp; show question':s==='open'?'↻ Ready again':'🔔 Get buzzers ready')+'</button><button class="btn" data-a="foreset" '+(s==='ready'||s==='open'||s==='won'?'':'disabled')+'>Reset</button></div>'+
     '<div class="small" style="margin:10px 0 4px">If a phone fails, say who was first:</div>'+
     '<div class="erow" style="gap:8px"><button class="btn" data-a="foset" data-t="A">'+esc(A)+' first</button><button class="btn" data-a="foset" data-t="B">'+esc(Bt)+' first</button></div>'+
     '<button class="btn" data-a="foqr" style="margin-top:10px">'+(showQR?'Hide':'Show')+' team QR codes</button>'+
@@ -411,7 +411,7 @@ function game(){
       (S.fast.awarded?'<div class="ok">Points awarded: '+esc(A.name)+' +'+S.fast.awards.A+' · '+esc(Bt.name)+' +'+S.fast.awards.B+'</div>':'')+'</div>';
   }else{
     var r=S.data.rounds[S.round];
-    h+='<div class="card"><div class="cat">ROUND '+(S.round+1)+' OF '+S.data.rounds.length+' · '+esc(r.category.en)+(r.multiplier>1?' · ×'+r.multiplier:'')+'</div><div class="q">'+esc(r.question.en)+'</div>'+
+    h+='<div class="card"><div class="cat">ROUND '+(S.round+1)+' OF '+S.data.rounds.length+' · '+esc(r.category.en)+(r.multiplier>1?' · ×'+r.multiplier:'')+'</div><div class="q">'+(state.L&&state.L.fo&&state.L.fo.state==='ready'?'🔒 Question hidden until you open the buzzers':esc(r.question.en))+'</div>'+
       (r.cue&&r.cue.en?'<div class="cue">'+esc(r.cue.en)+'</div>':'')+
       (rs.strikes>=3&&!rs.awarded?'<div class="banner">STEAL — '+esc(S.teams[rs.control==='A'?'B':'A'].name)+' gets one guess</div>':'')+
       r.answers.map(function(a,i){var on=rs.revealed[i];return '<div class="ans'+(on?' on':'')+'"><span class="rk">'+(i+1)+'</span><span class="t">'+esc(a.en)+'</span><span class="st">'+(on?'ON BOARD':'hidden')+'</span><span class="p">'+a.count+'</span></div>'}).join('')+
@@ -425,8 +425,8 @@ app.addEventListener('click',function(e){
   if(a==='mail'){var em=((document.getElementById('loginMail')||{}).value||'').trim();state.msg='';state.note='';if(!em){state.msg='Enter your email address.';draw();return}B.requestLink(em).then(function(){state.note='If that address is approved, a sign-in link is on its way. Check your inbox (and junk folder). It works once.';draw()},function(err){state.msg=String(err.message||err);draw()})}
   else if(a==='in')B.signIn((document.getElementById('loginTok')||{}).value).catch(function(err){state.msg='Sign-in failed: '+(err.message||err);draw()});
   else if(a==='out'){if(state.unsub)state.unsub();stopSurvey();B.signOut().then(function(){state.user=null;state.stage='login';state.sv=null;draw()})}
-  else if(a==='foopen'||a==='foreset'||a==='foset'){var S=state.S;if(!S||!S.teams)return;var nm={A:S.teams.A.name,B:S.teams.B.name};
-    B.faceoff(state.sv.code,a==='foopen'?'open':a==='foreset'?'reset':'set',b.dataset.t||null,nm).catch(function(err){alert('Could not do that: '+(err.message||err))})}
+  else if(a==='foopen'||a==='foready'||a==='foreset'||a==='foset'){var S=state.S;if(!S||!S.teams)return;var nm={A:S.teams.A.name,B:S.teams.B.name},rr=S.data&&S.data.rounds[S.round];
+    B.faceoff(state.sv.code,a==='foopen'?'open':a==='foready'?'ready':a==='foreset'?'reset':'set',b.dataset.t||null,nm,rr?rr.question.en:'').catch(function(err){alert('Could not do that: '+(err.message||err))})}
   else if(a==='foqr'){var f0=state.L&&state.L.fo;state.foQR=!(state.foQR==null?!f0:state.foQR);draw()}
   else if(a==='refresh')loadList();
   else if(a==='back'){if(state.unsub)state.unsub();stopSurvey();state.sv=null;state.S=null;state.stage='list';loadList()}
@@ -471,7 +471,7 @@ function serverBackend(){
     watchLive:function(code,cb){return C.subscribe('live:'+code,cb,{screen:true})},
     watchStats:function(code,cb){return C.subscribe('stats:'+code,cb,{screen:true})},
     watchGame:function(id,cb){return C.subscribe('game:'+id,cb)},
-    faceoff:function(code,action,arg,names){return C.rpc('faceoff',code,action,arg,names)}
+    faceoff:function(code,action,arg,names,question){return C.rpc('faceoff',code,action,arg,names,question)}
   }}
 (async function(){
   draw();

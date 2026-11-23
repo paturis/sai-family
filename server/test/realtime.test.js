@@ -300,9 +300,15 @@ test('face-off: first buzz wins, late buzz loses, host can set by hand, reset hi
     await tech.rpc('liveSet', 'FOFOF', { phase: 'done', stage: 'gate' });
     const a = client(s.base), b = client(s.base);
     assert.equal((await a.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'A' })).body.won, false, 'not open yet');
-    assert.equal((await host.rpc('faceoff', 'FOFOF', 'open', null, { A: 'Lions', B: 'Tigers' })).status, 200, 'an emcee may open the buzzers');
+    assert.equal((await host.rpc('faceoff', 'FOFOF', 'ready', null, { A: 'Lions', B: 'Tigers' })).status, 200, 'an emcee may arm the buzzers');
     const live = () => s.app.store.live.get('FOFOF').fo;
+    assert.equal(live().state, 'ready');
+    assert.equal(live().q, undefined, 'the question is not in the document yet');
+    assert.equal((await a.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'A' })).body.won, false, 'a buzz while only READY is ignored');
+    assert.equal(live().state, 'ready');
+    assert.equal((await host.rpc('faceoff', 'FOFOF', 'open', null, {}, 'Name something people do at dawn')).status, 200);
     assert.equal(live().state, 'open');
+    assert.equal(live().q, 'Name something people do at dawn', 'the question arrives together with the open buzzers');
     assert.deepEqual(live().names, { A: 'Lions', B: 'Tigers' });
     const [ra, rb] = await Promise.all([a.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'B' }), b.post('/api/faceoff/buzz', { code: 'FOFOF', team: 'A' })]);
     assert.equal([ra, rb].filter((r) => r.body.won).length, 1, 'exactly one winner');

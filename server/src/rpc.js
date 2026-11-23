@@ -94,9 +94,10 @@ export function createRpc({ store, auth, ai, mailer, config }) {
     codeFree: [STAFF, (user, c) => store.live.free(code(c))],
     liveSet: [STAFF, (user, c, o) => { store.live.set(code(c), obj(o)); return true; }],
     // face-off buzzers: the tech or an emcee opens them, resets them, or names the winner by hand (the fallback)
-    faceoff: [ANY, (user, c, action, arg, names) => {
+    faceoff: [ANY, (user, c, action, arg, names, question) => {
       const k = code(c);
-      if (action === 'open') store.faceoff.open(k, obj(names || {}));
+      if (action === 'ready') store.faceoff.ready(k, obj(names || {}));
+      else if (action === 'open') store.faceoff.open(k, obj(names || {}), question);
       else if (action === 'reset') store.faceoff.reset(k);
       else if (action === 'set') store.faceoff.set(k, str(arg, 1), obj(names || {}));
       else throw new HttpError(400, 'bad_request', 'Unknown face-off action');

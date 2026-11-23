@@ -99,10 +99,15 @@ Chrome: Settings, Privacy and security, Site settings, Sound).
 ### Face-off buzzers (who plays first)
 Before each round the two contestants decide who takes control. Each contestant opens their own team's buzzer page on their phone:
 the **emcee page shows two QR codes** (Team A and Team B; use "Show team QR codes") that open `buzz.html?code=…&team=A|B`. The tech
-console shows a green tick for each team's pad once it is connected. When the emcee has read the question, the **emcee or the tech
-presses "Open buzzers"**: the projector shows "BUZZERS OPEN!" with a sound, both pads turn into a big BUZZ button, and the first press
-wins (the server decides the order, so a slow connection cannot cheat). The projector shows who buzzed first with the buzz-in sound,
-that team is **put in control on the tech console automatically** (Undo changes it), and the screen clears itself after a few seconds.
+console shows a green tick for each team's pad once it is connected. It runs in two steps so that reading the question can never race the buzzers:
+1. **Get buzzers ready** (emcee or tech). The projector shows "Get ready…", the pads show "Get ready…", and the **question is hidden**
+   on the projector and the emcee phone. Buzzes are ignored.
+2. **Open buzzers & show question**. In the same instant the buzzers go live, the projector shows "BUZZERS OPEN!" with the question
+   and a sound, and the emcee phone shows the question. The emcee reads it aloud after this. The first press wins (the server decides
+   the order, so a slow connection cannot cheat).
+
+The projector then shows who buzzed first with the buzz-in sound, that team is **put in control on the tech console automatically**
+(Undo changes it), and the screen clears itself after a few seconds.
 **Fallback:** if a phone fails, press "Team A first" or "Team B first" on the tech console or the emcee page: it does the same thing by
 hand. "Reset" closes the buzzers. This needs the self-hosted server.
 
