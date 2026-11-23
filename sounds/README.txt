@@ -15,7 +15,7 @@ same name. Supported formats: mp3, ogg, wav, m4a. Use lower-case names:
   timeup     time is up (a countdown or a survey question ends)
   sting      a new round or survey question starts
   steal      three strikes: the other team may steal
-  fastmoney  the Fast Money round begins
+  saifive     the Sai Five round begins
   thinking   the soundboard's "thinking" music (it loops until stopped)
 
 Example: sounds/buzzer.mp3

@@ -410,7 +410,7 @@ function drawGame(){
     '<div class="mid"><div><b>ONE SAI FAMILY</b><span>SURVEY SAYS!</span>'+(D.timerRunning?'<div class="timer'+(tl<=5?' u':'')+'" id="tm">'+String(tl).padStart(2,'0')+'s</div>':'')+'</div></div>'+
     '<div class="team'+(ctl==='B'?' ctl':'')+'"><div><div class="l">TEAM B'+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</div><div class="n">'+esc(t.B.name)+'</div></div><div class="s">'+t.B.score+'</div></div></div>';
   if(D.view==='fast'&&D.fast){
-    h+='<div class="cat">⚡ FAST MONEY · '+D.fast.questions.length+' QUESTIONS</div><div style="margin-top:2vh">'+
+    h+='<div class="cat">⚡ SAI FIVE · '+D.fast.questions.length+' QUESTIONS</div><div style="margin-top:2vh">'+
       D.fast.questions.map(function(f,i){return '<div class="fq"><span class="no">'+(i+1)+'</span><div><div class="t">'+esc(f.q)+'</div>'+(f.answers?'<div class="ans">'+f.answers.map(function(a){return esc(a.t)+' ('+a.p+')'}).join(' · ')+'</div>':'')+'</div></div>'}).join('')+'</div>';
     if(D.fast.awarded){var w=t.A.score===t.B.score?null:(t.A.score>t.B.score?t.A:t.B);
       h+='<div class="win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It’s a tie — One Sai Family wins!')+'</h2><div>'+esc(t.A.name)+' '+t.A.score+' — '+t.B.score+' '+esc(t.B.name)+'</div></div>'}
@@ -494,7 +494,7 @@ function soundForDoc(p,d){
     if(nr.awarded&&!pr.awarded){snd('fanfare');setTimeout(function(){snd('applause')},250)}
     if(nr.steal&&!pr.steal)snd('steal')
   }else if(nr&&pr)snd('sting');
-  if(p&&d.view==='fast'&&p.view!=='fast')snd('fastmoney');
+  if(p&&d.view==='fast'&&p.view!=='fast')snd('saifive');
   if(p&&p.fast&&d.fast){
     if(d.fast.reveal&&!p.fast.reveal)snd('ding');
     if(d.fast.awarded&&!p.fast.awarded){snd('fanfare');setTimeout(function(){snd('applause')},250)}}

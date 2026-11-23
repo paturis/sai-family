@@ -89,7 +89,7 @@ await step('game board', async () => {
   await p.keyboard.press('Escape'); await sleep(200);
   await click(p, '#editBtn'); await sleep(400); await shot(p, '17-editor');
   await p.keyboard.press('Escape'); await sleep(200);
-  await p.evaluate(() => window.__console.setView('fast')); await sleep(400); await shot(p, '18-fast-money');
+  await p.evaluate(() => window.__console.setView('fast')); await sleep(400); await shot(p, '18-sai-five');
   await p.evaluate(() => window.__console.setView('rounds', 2)); await sleep(300);
   await p.keyboard.press('p'); await sleep(600); await shot(p, '19-presentation');
   await p.keyboard.press('p'); await sleep(300);

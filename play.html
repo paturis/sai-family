@@ -51,7 +51,7 @@ function scoreCard(){if(!disp)return '';var t=disp.teams,r=disp.round;
   return '<div class="card" style="margin-top:12px"><div class="pill">LIVE SCORES</div><div style="display:flex;justify-content:space-between;gap:10px;text-align:center">'+
    '<div style="flex:1"><div style="font-size:13px;color:var(--blue);font-weight:700">'+esc(t.A.name)+'</div><div style="font:700 48px/1.1 var(--font-head);color:var(--orange-d)">'+t.A.score+'</div></div>'+
    '<div style="flex:1"><div style="font-size:13px;color:var(--blue);font-weight:700">'+esc(t.B.name)+'</div><div style="font:700 48px/1.1 var(--font-head);color:var(--orange-d)">'+t.B.score+'</div></div></div>'+
-   (r?'<div style="margin-top:8px;font-size:14px;color:var(--navy)"><b>Round '+r.n+':</b> '+esc(r.question)+'</div>':(disp.view==='fast'?'<div style="margin-top:8px;font-size:14px"><b>Fast Money</b></div>':''))+'</div>'}
+   (r?'<div style="margin-top:8px;font-size:14px;color:var(--navy)"><b>Round '+r.n+':</b> '+esc(r.question)+'</div>':(disp.view==='fast'?'<div style="margin-top:8px;font-size:14px"><b>Sai Five</b></div>':''))+'</div>'}
 function askCode(msg){
   view.innerHTML='<div class="card"><div class="pill">JOIN THE SURVEY</div><p class="q">Enter the code shown on the screen</p>'+
    '<input type="text" id="codeIn" maxlength="5" autocapitalize="characters" autocomplete="off" placeholder="e.g. K7PQ2">'+

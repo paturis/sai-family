@@ -406,7 +406,7 @@ function game(){
   var A=S.teams.A,Bt=S.teams.B,view=S.view,rs=S.roundStates&&S.roundStates[S.round],ctl=view==='rounds'&&rs?rs.control:null;
   var h='<div class="score"><div class="team'+(ctl==='A'?' ctl':'')+'"><b>'+esc(A.name)+(ctl==='A'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+A.score+'</span></div><div class="team'+(ctl==='B'?' ctl':'')+'"><b>'+esc(Bt.name)+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+Bt.score+'</span></div></div>';
   if(view==='fast'){
-    h+='<div class="card"><div class="cat">⚡ FAST MONEY · '+S.data.fast.length+' QUESTIONS</div><div style="margin-top:8px">'+
+    h+='<div class="card"><div class="cat">⚡ SAI FIVE · '+S.data.fast.length+' QUESTIONS</div><div style="margin-top:8px">'+
       S.data.fast.map(function(f,i){return '<div class="fq"><div class="t">'+(i+1)+'. '+esc(f.question.en)+'</div><div class="a">'+f.answers.map(function(a){return esc(a.en)+' ('+a.count+')'}).join(' · ')+'</div></div>'}).join('')+'</div>'+
       (S.fast.awarded?'<div class="ok">Points awarded: '+esc(A.name)+' +'+S.fast.awards.A+' · '+esc(Bt.name)+' +'+S.fast.awards.B+'</div>':'')+'</div>';
   }else{

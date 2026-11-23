@@ -129,7 +129,7 @@ purpose. The server answers all of these with the same app (`index.html`), so no
 
 ### Taking mistakes back (tech)
 Everything the tech does on the board can be undone: reveals, hides, strikes, who has control, awarding a round (even to the wrong
-team), score corrections and Fast Money. **Z** or **Ctrl/⌘+Z** undoes the last action, **Shift+Z** redoes it, and the sidebar shows the
+team), score corrections and Sai Five. **Z** or **Ctrl/⌘+Z** undoes the last action, **Shift+Z** redoes it, and the sidebar shows the
 last action plus a list of recent ones. **X** adds a strike and **Shift+X** removes one. After an award the sidebar says
 "Wrong team? Press Undo." The projector and emcee follow every undo instantly.
 

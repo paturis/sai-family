@@ -76,5 +76,9 @@ export function openDb(dir) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;');
   db.exec(SCHEMA);
+  // The last round used to be called "Fast Money"; it is "Sai Five" everywhere. Rename it in questions saved earlier (safe to repeat).
+  for (const t of ['questions', 'surveys']) {
+    db.exec(`UPDATE ${t} SET json = replace(replace(json, '"category":"Fast Money"', '"category":"Sai Five"'), 'Fast Money · Q', 'Sai Five · Q') WHERE json LIKE '%Fast Money%'`);
+  }
   return db;
 }

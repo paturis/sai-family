@@ -7,7 +7,7 @@ each role. Free tier is enough for one event of about 200 people.
 | Role | Page | Sign-in | What they do |
 |---|---|---|---|
 | **Admin / organizer** | `index.html` | Google, `role: admin` | Question bank, create/edit/clone/delete surveys, past results, everything the tech can do |
-| **IT tech (operator)** | `index.html` | Google, `role: tech` | Launch and run Round 0 (QR, timers), group answers, load the board, then operate the game: reveals, strikes, points, manual score fixes, timers, Fast Money. Cannot edit the bank or delete/clone surveys |
+| **IT tech (operator)** | `index.html` | Google, `role: tech` | Launch and run Round 0 (QR, timers), group answers, load the board, then operate the game: reveals, strikes, points, manual score fixes, timers, Sai Five. Cannot edit the bank or delete/clone surveys |
 | **Game host (emcee)** | `emcee.html` | Google, `role: host` | Read-only live view on a phone/tablet: current question, cue, all answers (hidden ones visible only to them), what is on the board, strikes, scores |
 | **Audience (hall screen)** | `display.html?code=XXXXX` | none | Public scoreboard for the projector: team scores, the board with revealed answers only, strikes (big X), timer, final result. Updates within about a second of the tech's actions |
 | **Audience (phones)** | `play.html?code=XXXXX` (the QR) | none (anonymous) | Answer the survey; after it ends they see live scores |

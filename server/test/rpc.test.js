@@ -141,3 +141,17 @@ test('bad input is rejected, not crashed on', async () => {
     assert.equal((await fetch(s.base + '/api/rpc')).status, 405);
   } finally { await s.close(); }
 });
+
+test('the old "Fast Money" label is renamed to "Sai Five" in questions saved earlier', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const { openDb } = await import('../src/db.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mig-'));
+  let db = openDb(dir);
+  db.prepare('INSERT INTO questions(id,json,created_at) VALUES(?,?,1)').run('q1', JSON.stringify({ en: 'Name x', kind: 'fast', category: 'Fast Money' }));
+  db.prepare('INSERT INTO surveys(id,json,created_at) VALUES(?,?,1)').run('s1', JSON.stringify({ name: 'S', questions: [{ en: 'Name y', kind: 'fast', category: 'Fast Money' }] }));
+  db.close();
+  db = openDb(dir);
+  assert.equal(JSON.parse(db.prepare('SELECT json FROM questions WHERE id=?').get('q1').json).category, 'Sai Five');
+  assert.equal(JSON.parse(db.prepare('SELECT json FROM surveys WHERE id=?').get('s1').json).questions[0].category, 'Sai Five');
+  db.close();
+});

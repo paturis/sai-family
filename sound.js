@@ -4,7 +4,7 @@
    Used by the projector page, which is the laptop connected to the hall speakers. */
 (function () {
   'use strict';
-  var NAMES = ['intro', 'ding', 'buzzer', 'fanfare', 'applause', 'drumroll', 'tick', 'timeup', 'sting', 'steal', 'fastmoney', 'thinking', 'faceoff', 'buzzin'];
+  var NAMES = ['intro', 'ding', 'buzzer', 'fanfare', 'applause', 'drumroll', 'tick', 'timeup', 'sting', 'steal', 'saifive', 'thinking', 'faceoff', 'buzzin'];
   var ctx = null, bus = null, files = {}, thinkTimer = null, loopSrc = null, listeners = [];
   var packFiles = {}, avail = {}, want = 'builtin', loadedIndex = false;
   var state = { vol: 0.85, mute: false, unlocked: false, files: [], pack: 'builtin' };
@@ -118,8 +118,8 @@
     steal: function (c, o, t) {
       ['E5', 'C5', 'A4'].forEach(function (n, i) { tone(c, o, t + i * 0.22, hz(n), 0.3, 'square', 0.16, { lp: 1600 }); });
     },
-    /* Fast Money: quick rising run */
-    fastmoney: function (c, o, t) {
+    /* Sai Five: quick rising run */
+    saifive: function (c, o, t) {
       var run = ['C5', 'E5', 'G5', 'B5', 'C6', 'B5', 'G5', 'E5', 'C5', 'E5', 'G5', 'C6'];
       run.forEach(function (n, i) { tone(c, o, t + i * 0.11, hz(n), 0.16, 'triangle', 0.22); });
       tone(c, o, t + 1.35, hz('C6'), 0.9, 'sawtooth', 0.2, { lp: 2400, hold: 1, release: 0.3 });

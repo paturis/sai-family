@@ -12,7 +12,7 @@ Put your files here, named like this (mp3, ogg, wav or m4a):
   buzzer.mp3     the wrong-answer / strike buzzer
   fanfare.mp3    the round-won music
   applause.mp3   crowd applause
-  fastmoney.mp3  the Fast Money music
+  saifive.mp3  the Sai Five music
   thinking.mp3   background music (loops until stopped)
   drumroll.mp3   a drum roll
   tick.mp3       one tick of a countdown (played in each of the last 5 seconds)
