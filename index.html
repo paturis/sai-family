@@ -129,7 +129,7 @@ let info=`<div class="panel"><h3>${T('FACILITATOR NOTE','NOTA DEL FACILITADOR')}
 let teams=`<div class="panel"><h3>${T('TEAM NAMES','NOMBRES DE EQUIPOS')}</h3><div class="control-row"><label style="flex:1"><span class="field-label">A</span><input type="text" data-team-name="A" value="${esc(S.teams.A.name)}" maxlength="24"></label><label style="flex:1"><span class="field-label">B</span><input type="text" data-team-name="B" value="${esc(S.teams.B.name)}" maxlength="24"></label></div><button class="btn small full" id="resetAllBtn">${T('Reset all scores and rounds','Reiniciar puntuaciones y rondas')}</button></div>`;
 el.innerHTML=controls+adjustHtml()+time+info+teams;}
 function renderBanner(){let el=document.getElementById('dataBanner');if(S.confirmedSurvey){el.classList.add('hidden');return}el.classList.remove('hidden');let label=S.customized?T('CUSTOM DATA — NOT CONFIRMED','DATOS PERSONALIZADOS — SIN CONFIRMAR'):T('DEMONSTRATION DATA','DATOS DE DEMOSTRACIÓN');let msg=S.customized?T('Please verify the rankings and counts against the actual retreat survey.','Verifica los rangos y conteos con la encuesta real.'):T('Sample answer rankings and point values are fictional. Verify all factual titles and replace counts with actual survey results before the retreat.','Las respuestas y puntuaciones son ficticias. Sustitúyelas por los resultados reales de la encuesta.');el.innerHTML=`<div><b>${label}</b> — ${msg}</div><button id="bannerEdit">${T('Edit survey →','Editar encuesta →')}</button>`;}
-function render(){document.documentElement.lang=S.lang;document.body.classList.toggle('presentation',S.presentation);document.getElementById('langBtn').textContent=S.lang==='en'?'ESPAÑOL':'ENGLISH';document.getElementById('soundBtn').textContent=S.sound?'♫ '+T('Sound on','Sonido activo'):'♫ '+T('Sound off','Sin sonido');document.getElementById('presentBtn').textContent=S.presentation?T('Exit presentation','Salir de presentación'):'⛶ '+T('Presentation mode','Modo presentación');renderBanner();renderScore();renderNav();renderStage();renderSidebar();persist();}
+function render(){document.documentElement.lang=S.lang;document.body.classList.toggle('presentation',S.presentation);document.getElementById('langBtn').textContent=S.lang==='en'?'ESPAÑOL':'ENGLISH';document.getElementById('soundBtn').textContent=S.sound?'♫ '+T('Sound on','Sonido activo'):'♫ '+T('Sound off','Sin sonido');document.getElementById('presentBtn').textContent=S.presentation?T('Exit presentation','Salir de presentación'):'⛶ '+T('Presentation mode','Modo presentación');renderBanner();renderScore();renderNav();renderStage();renderSidebar();persist();if(window.syncUrl)window.syncUrl();}
 function revealAnswer(i){if(S.view!=='rounds')return;let rs=roundState();if(i<0||i>=currentRound().answers.length)return;const a=currentRound().answers[i],will=!rs.revealed[i];
   act((will?T('Revealed','Reveló'):T('Hid','Ocultó'))+' #'+(i+1)+' “'+L(a)+'”',()=>{rs.revealed[i]=will});if(will)beep('reveal');render()}
 function awardRound(team){let rs=roundState();if(rs.awarded){toast(T('Already awarded. Wrong team? Press Undo (Z) first.','Ya asignado. ¿Equipo equivocado? Pulsa Deshacer (Z).'));return}let points=sumRevealed(S.round);
@@ -1040,6 +1040,7 @@ function gItemFromForm(){const q=A.gf,g=GAMES[q.game],o=Object.assign({},q,{game
 function paint(){
   syncHeaderRole();
   const r=root();if(!r)return;
+  syncUrl();
   if(A.stage==='off'){r.classList.add('hidden');document.body.classList.remove('r0-open');stopTimers();return}
   r.classList.remove('hidden');document.body.classList.add('r0-open');r.classList.toggle('stage',['lobby','collect','gate'].includes(A.stage));
   const f={login:vLogin,denied:vDenied,hostonly:vHostOnly,dash:vDash,qform:vQForm,sform:vForm,survey:vSurvey,lobby:vLobby,collect:vCollect,tabulate:vTabulate,gate:vGate,gform:vGForm,gitem:vGItem,gsession:vGSession,gplay:vGPlay}[A.stage]||vLogin;
@@ -1066,7 +1067,7 @@ async function onUser(u){
     try{await loadAll()}catch(e){A.status='Could not load data: '+e.message}
     if(saved.surveyId&&['lobby','collect','tabulate','gate'].includes(saved.resume)){const sv=await Cloud.getSurvey(saved.surveyId).catch(()=>null);if(sv){A.sv=sv;A.surveyId=sv.id;await resumeSurvey();return}}
     if(saved.surveyId&&['off','gplay'].includes(saved.resume)){const sv=await Cloud.getSurvey(saved.surveyId).catch(()=>null);if(sv&&await resumeGameStage(sv))return}
-    A.stage='dash';paint()
+    A.stage='dash';paint();if(initialRoute&&/^#\/(questions|team|games|sessions|live)/.test(initialRoute))applyRoute(initialRoute)
   }else{A.user=u;A.stage='denied';paint()}}
 const isAdmin=()=>A.role==='admin';
 /* Reload / accidental Back while a game is running: put the tech straight back into it (no prompt). */
@@ -1205,13 +1206,62 @@ function showLinks(){
     if(b&&b.dataset.lcopy!==undefined){const k=b.dataset.lcopy,ok=await copyText(k==='all'?all:L[+k][1]),t=b.textContent;b.textContent=ok?'Copied ✓':'Press Ctrl+C';setTimeout(()=>{b.textContent=t},1600)}});
   document.body.appendChild(d)}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=document.getElementById('linksOv');if(o)o.remove()}});
-/* Back button / tab close guard for the tech console */
-(function(){
-  const active=()=>['lobby','collect','tabulate','gate','off','gplay'].includes(A.stage);
-  try{history.replaceState({sf:0},'');history.pushState({sf:1},'')}catch(e){}
-  window.addEventListener('popstate',()=>{if(!active())return;try{history.pushState({sf:1},'')}catch(e){}toast('Back is disabled while a session is running — use the on-screen buttons.')});
-  window.addEventListener('beforeunload',e=>{if(active()){e.preventDefault();e.returnValue=''}});
-})();
+/* ---------- URLs: the address bar follows where you are (#/questions, #/sessions/ID, #/live/ID/tabulate/2, …).
+   Reload and bookmarks land in the right place, and Back / Forward browse the dashboard, bank and session pages.
+   While a session is running (lobby → game) Back is blocked on purpose: a stray click must not leave a live show. ---------- */
+const ACTIVE=['lobby','collect','tabulate','gate','off','gplay'];
+const active=()=>ACTIVE.includes(A.stage);
+function routeOf(){
+  const id=A.sv&&A.sv.id;
+  switch(A.stage){
+    case 'dash':return A.tab==='bank'?'/questions':A.tab==='team'?'/team':String(A.tab).startsWith('g:')?'/games/'+String(A.tab).slice(2):'/sessions';
+    case 'qform':return A.qf&&A.qf.id?'/questions/'+A.qf.id:'/questions/new';
+    case 'sform':return A.form&&A.form.id?'/sessions/'+A.form.id+'/edit':'/sessions/new';
+    case 'survey':return '/sessions/'+id;
+    case 'lobby':return '/live/'+id+'/lobby';
+    case 'collect':return '/live/'+id+'/question/'+(A.q+1);
+    case 'tabulate':return '/live/'+id+'/tabulate/'+(A.tabQ+1);
+    case 'gate':return '/live/'+id+'/gate';
+    case 'off':return '/live/'+id+'/board/'+(S.view==='fast'?'fast':'round/'+(S.round+1));
+    case 'gform':return '/games/'+(A.gform&&A.gform.game)+'/session/'+((A.gform&&A.gform.id)||'new');
+    case 'gitem':return '/games/'+(A.gf&&A.gf.game)+'/question/'+((A.gf&&A.gf.id)||'new');
+    case 'gsession':return '/games/'+(A.sv&&A.sv.game)+'/session/'+id;
+    case 'gplay':return '/games/'+(A.sv&&A.sv.game)+'/play/'+id;
+    case 'hostonly':return '/emcee';
+    default:return null}}
+let urlKey='',routing=false;
+function syncUrl(){
+  const r=routeOf();if(!r)return;                       // sign-in / denied: leave the address alone (a deep link survives sign-in)
+  const h='#'+r;if(location.hash===h)return;
+  const key=A.stage+'|'+(A.stage==='dash'?A.tab:'')+'|'+(A.sv&&A.sv.id||'')+'|'+((A.qf&&A.qf.id)||(A.form&&A.form.id)||(A.gf&&A.gf.id)||'');
+  try{if(routing||!urlKey||key===urlKey)history.replaceState(null,'',h);else history.pushState(null,'',h)}catch(e){}
+  urlKey=key}
+window.syncUrl=syncUrl;
+/* go to the page named by an address (Back / Forward / deep link). Never leaves or changes a running session. */
+async function applyRoute(hash){
+  if(active())return;
+  const p=String(hash||'').replace(/^#?\/?/,'').split('/').filter(Boolean),dash=async tab=>{if(A.stage!=='dash'||!A.surveys){await goDash()}A.tab=tab;A.status='';A.stage='dash';paint()};
+  routing=true;
+  try{
+    if(!A.user||!['admin','tech'].includes(A.role))return;
+    const k=p[0],a1=p[1];
+    if(k==='questions'&&isAdmin()){
+      if(a1==='new'){A.qf={kind:'round',multiplier:1,source:'discourse',tags:[],answers:[],en:'',category:''};A.stage='qform';paint()}
+      else if(a1){const q=A.bank.find(x=>x.id===a1);if(q){A.qf=deepCopy(q);A.stage='qform';paint()}else await dash('bank')}
+      else await dash('bank')}
+    else if(k==='team'&&isAdmin())await dash('team');
+    else if(k==='games'&&a1&&GAMES[a1]&&!p[2])await dash('g:'+a1);
+    else if(k==='sessions'&&a1==='new'&&isAdmin()){A.form={name:'',sel:[],q:'',tag:''};A.stage='sform';paint()}
+    else if(k==='sessions'&&a1)await openSv(a1);
+    else if(k==='live'&&a1){const sv=await Cloud.getSurvey(a1).catch(()=>null);if(sv)await openSv(a1);else await dash('surveys')}
+    else await dash('surveys');
+  }catch(e){console.error(e)}
+  finally{routing=false;syncUrl()}}
+window.addEventListener('popstate',()=>{
+  if(active()){try{history.pushState(null,'','#'+routeOf())}catch(e){}toast('Back is disabled while a session is running — use the on-screen buttons.');return}
+  urlKey='';applyRoute(location.hash)});
+window.addEventListener('beforeunload',e=>{if(active()){e.preventDefault();e.returnValue=''}});
+const initialRoute=location.hash;
 async function boot(){
   paint();
   if(Cloud.configured()){try{await Cloud.start(window.BACKEND==='server'?'server':'firebase',window.FIREBASE_CONFIG);Cloud.onAuth(onUser)}catch(e){A.status='Could not start the back end: '+e.message;paint()}}}
