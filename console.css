@@ -420,3 +420,11 @@ body.presentation .side{display:none}
 .sf-rrow .no{font:800 18px var(--font-head,inherit);color:var(--orange,#e67e17)}.sf-rrow .q{font-weight:600;color:#fff}.sf-rrow .a{color:#cfdde4}.sf-rrow .st{font-size:12px;text-align:right;color:#9fb3be}
 .sf-rrow.next{border-color:var(--orange,#e67e17);box-shadow:0 0 0 2px rgba(230,126,23,.35)}.sf-rrow.ok{background:#1f6b36}.sf-rrow.ok .a,.sf-rrow.bad .a{color:#fff}.sf-rrow.bad{background:#7d2118}
 .sf-fgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px}.sf-fgrid .box{background:rgba(255,255,255,.08);border-radius:12px;padding:14px;text-align:center;color:#fff}.sf-fgrid h3{margin:0;color:var(--orange,#e67e17)}.sf-fgrid .big{font:800 54px/1.1 var(--font-head,inherit)}
+/* Sai Five: tick the answers each team got */
+.sf-mrows{display:grid;gap:8px;margin:12px 0}
+.sf-mhead,.sf-mrow{display:grid;grid-template-columns:36px 1fr 140px 140px;gap:10px;align-items:center}
+.sf-mhead b{text-align:center;color:var(--orange,#e67e17);font:800 13px var(--font,inherit);letter-spacing:.1em;text-transform:uppercase}
+.sf-mrow{padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}.sf-mrow.got{background:#1f6b36}
+.sf-mrow .rk{font:800 18px var(--font-head,inherit);color:var(--orange,#e67e17)}.sf-mrow.got .rk{color:#fff}.sf-mrow .an{font-weight:600;color:#fff}.sf-mrow .an em{font-style:normal;margin-left:8px;padding:1px 8px;border-radius:99px;background:rgba(0,0,0,.3);font-size:12px}
+.sf-tick{padding:11px;border-radius:9px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);color:#fff;font:800 15px var(--font,inherit);cursor:pointer}
+.sf-tick[data-fq-tick^="A"].on{background:#59b7e6;color:#0d2d3d;border-color:#fff}.sf-tick[data-fq-tick^="B"].on{background:#f5a447;color:#0d2d3d;border-color:#fff}

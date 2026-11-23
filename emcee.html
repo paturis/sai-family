@@ -407,13 +407,13 @@ function game(){
   var A=S.teams.A,Bt=S.teams.B,view=S.view,rs=S.roundStates&&S.roundStates[S.round],ctl=view==='rounds'&&rs?rs.control:null;
   var h='<div class="score"><div class="team'+(ctl==='A'?' ctl':'')+'"><b>'+esc(A.name)+(ctl==='A'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+A.score+'</span></div><div class="team'+(ctl==='B'?' ctl':'')+'"><b>'+esc(Bt.name)+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+Bt.score+'</span></div></div>';
   if(view==='fast'){
-    var FF=S.fast||{},who=(FF.turn===1?(FF.first==='B'?A:Bt):(FF.first==='B'?Bt:A));
-    h+='<div class="card"><div class="cat">⚡ SAI FIVE · LIGHTNING ROUND · '+(FF.awarded?'FINISHED':esc(who.name)+(FF.step==='reveal'?' · REVEALING':' PLAYING · '+((FF.secs||{})[FF.turn===1?'second':'first']||60)+' SECONDS'))+'</div><div style="margin-top:8px">'+
-      S.data.fast.map(function(f,i){
-        var F=S.fast||{},ch=F.choices||{},sd=F.said||{},cur=F.q||0,pk=function(t,nm){var c=(ch[t]||[])[i];if(c==null||c===-2)return '';
-          return '<div class="a"><b>'+esc(nm)+':</b> '+(c>=0&&f.answers[c]?esc(f.answers[c].en)+' ('+2*f.answers[c].count+' pts)':'✕ '+esc((sd[t]||[])[i]||'not on the board')+' (0)')+'</div>'};
-        return '<div class="fq'+(i===cur&&F.step!=='reveal'?' cur':'')+'"><div class="t">'+(i+1)+'. '+esc(f.question.en)+'</div><div class="a">'+f.answers.map(function(a){return esc(a.en)+' ('+2*a.count+')'}).join(' · ')+'</div>'+pk('A',A.name)+pk('B',Bt.name)+'</div>'}).join('')+'</div>'+
-      (S.fast.awarded?'<div class="ok">Points awarded: '+esc(A.name)+' +'+S.fast.awards.A+' · '+esc(Bt.name)+' +'+S.fast.awards.B+'</div>':'')+'</div>';
+    var FF=S.fast||{},gt=FF.got||{A:[],B:[]},cq=FF.q||0,nq=S.data.fast.length,fq=S.data.fast[cq],sc=[10,20,30,40,50].reverse();
+    var had=function(t,j){return ((gt[t]||[])[cq]||[]).indexOf(j)>=0};
+    h+='<div class="card"><div class="cat">⚡ SAI FIVE · QUESTION '+(cq+1)+' OF '+nq+' · '+(FF.awarded?'FINISHED':FF.step==='mark'?'MARK THE PAPERS':'WRITING · '+(FF.secs||60)+' SECONDS')+'</div><div class="q">'+esc(fq.question.en)+'</div>'+
+      '<div class="small">Both reps write their top 5. The tech ticks the answers each team got; points are added as they are ticked.</div>'+
+      fq.answers.slice(0,5).map(function(a,j){var tg=(had('A',j)?' <b class="ta">'+esc(A.name)+'</b>':'')+(had('B',j)?' <b class="ta">'+esc(Bt.name)+'</b>':'');
+        return '<div class="ans'+(had('A',j)||had('B',j)?' on':'')+'"><span class="rk">'+(j+1)+'</span><span class="t">'+esc(a.en)+tg+'</span><span class="st">'+(had('A',j)||had('B',j)?'GIVEN':'hidden')+'</span><span class="p">'+sc[j]+'</span></div>'}).join('')+
+      '<div class="small" style="margin-top:8px">This question: '+esc(A.name)+' +'+((gt.A||[])[cq]||[]).reduce(function(t,j){return t+sc[j]},0)+' · '+esc(Bt.name)+' +'+((gt.B||[])[cq]||[]).reduce(function(t,j){return t+sc[j]},0)+'</div></div>';
   }else{
     var r=S.data.rounds[S.round];
     h+='<div class="card"><div class="cat">ROUND '+(S.round+1)+' OF '+S.data.rounds.length+' · '+esc(r.category.en)+(r.multiplier>1?' · ×'+r.multiplier:'')+'</div><div class="q">'+(state.L&&state.L.fo&&state.L.fo.state==='ready'?'🔒 Question hidden until you open the buzzers':esc(r.question.en))+'</div>'+

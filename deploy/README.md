@@ -111,21 +111,19 @@ The projector then shows who buzzed first with the buzz-in sound, that team is *
 **Fallback:** if a phone fails, press "Team A first" or "Team B first" on the tech console or the emcee page: it does the same thing by
 hand. "Reset" closes the buzzers. This needs the self-hosted server.
 
-### Sai Five (the lightning round) on the day
-The first team gets **one clock (60 s) for all the questions**; then the second team plays the **same questions with less time (45 s)**.
-Both times are editable in the bar at the top of the page, along with Start / Pause / Reset. Wrong answers score 0 and the team keeps the
-points from its right answers; points are 2× the board points.
-1. **Team 1 plays.** Press **Start 60s**. As the team answers, click the board answer it said: it moves **straight to the next question**.
-   If they said something that is **not on the board**, click **✕ Not on the board** (type what they said and press Enter if you want it
-   shown). **Pass →** skips a question; it comes back after the last one if there is time. The projector shows only the current question,
-   a big countdown and progress dots, never the answers.
-2. **Time up** (the clock hits 0, or press **Stop the clock & reveal answers**). The projector shows the board with everything hidden;
-   press **R** (or Reveal answer) to reveal one answer at a time: a ding and the points for a right answer, a red ✕ with what was said and
-   a buzzer for a wrong one. **Reveal all** does the rest.
-3. **Team 2 plays** the same questions: press "Team B plays the same questions (45s)". The projector shows Team A's score to beat. Team 2
-   **may not repeat Team 1's answers** (a buzzer sounds and the tech asks for another; untick the box at the top to allow repeats).
-4. After Team 2's reveal, **Finish — award Sai Five points**. The points are added to the team scores. The winner is the team with more
-   total points; if tied, more Sai Five points, then more right answers. Every step can be undone.
+### Sai Five (the last round) on the day
+**One question at a time.** The top 5 answers of each Sai Five question are worth **50, 40, 30, 20, 10** (fixed by rank; no doubling).
+1. **Write (60 s).** One rep from each team writes down their top 5 answers on paper at the same time. The tech presses **Start 60s**
+   (the clock and its seconds box are at the top of the page). The projector shows the question and a big countdown; a **buzzer sounds at 0**
+   and the tech page switches to marking.
+2. **Mark.** The hosts mark the papers. The tech sees the question's 5 board answers, each with an **A** and a **B** button: tick the answers
+   each team got. **Each tick shows the answer on the projector at once** (with the team's tag, its points and a ding) and **adds the points
+   to that team's score straight away**. If both teams got an answer, tick both: both score. Tick again to remove. "Show the answers nobody got"
+   reveals the rest. The emcee phone shows which answers each team got.
+3. **Next question** (clock back to 60 s), for the next pair of reps. Repeat for all 5.
+4. **Finish Sai Five.** The projector shows each team's points per question and the Sai Five total, and **the winner is the team with the
+   higher total score across all rounds**. Every step can be undone (Undo takes the points back too); **Reset Sai Five** takes all its points
+   off the scores.
 Pictures: `docs/screens/sai-five-*.png`.
 
 ### Answers and points when you tabulate

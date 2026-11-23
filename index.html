@@ -80,23 +80,17 @@ const DEFAULT_DATA={
 };
 const STORAGE='oneSaiFamilyFeud_45min_v3';
 const deepCopy=o=>JSON.parse(JSON.stringify(o));
-/* Sai Five = the lightning round. The first team gets ONE clock (60 s) to get through all the questions: click what they said, it moves straight on
-   to the next question; "Pass" skips and comes back if time is left. When time is up (or all are answered) the answers are revealed one by one.
-   Then the second team plays the SAME questions with less time (45 s) and may not repeat the first team's answers. Wrong = 0 points, right = 2x the
-   board points. The team with more points wins; if tied, the team with more right answers.
-   choices: -2 = no answer yet, -1 = said something NOT on the board (0), 0.. = the board answer. said = what they said when it was not on the board. */
-function newFast(n){const a=v=>({A:Array(n).fill(v),B:Array(n).fill(v)});
-  return{choices:a(-2),said:a(''),rev:a(false),first:'A',turn:0,step:'play',q:0,secs:{first:60,second:45},norepeat:true,awarded:false,reveal:false,awards:{A:0,B:0}}}
-function ensureFast(){const n=S.data.fast.length,f=S.fast=S.fast||newFast(n),d=newFast(n);
-  f.choices=f.choices||d.choices;f.said=f.said||d.said;f.rev=f.rev||d.rev;
-  ['A','B'].forEach(t=>{f.choices[t]=(f.choices[t]||[]).slice(0,n);f.said[t]=(f.said[t]||[]).slice(0,n);f.rev[t]=(f.rev[t]||[]).slice(0,n);
-    while(f.choices[t].length<n)f.choices[t].push(-2);while(f.said[t].length<n)f.said[t].push('');while(f.rev[t].length<n)f.rev[t].push(false)});
-  if(typeof f.shown==='number'){for(let i=0;i<Math.min(f.shown,n);i++){f.rev.A[i]=f.rev.B[i]=true}delete f.shown}
-  else if((f.reveal||f.awarded)&&!f.rev.A.some(Boolean)&&!f.rev.B.some(Boolean)){for(let i=0;i<n;i++){f.rev.A[i]=f.rev.B[i]=true}}
-  if(Array.isArray(f.first))f.first=f.first[0]||'A';if(f.first!=='B')f.first='A';delete f.mode;
-  f.turn=f.turn===1?1:0;f.step=f.step==='reveal'?'reveal':'play';if(f.awarded){f.turn=1;f.step='reveal'}
-  f.norepeat=f.norepeat!==false;f.secs=Object.assign({first:60,second:45},f.secs||{});
-  f.q=Math.max(0,Math.min(n-1,Number(f.q)||0));f.awards=f.awards||{A:0,B:0}}
+/* Sai Five: ONE question at a time. A rep from each team writes their top 5 answers on paper at the same time (60 s). The hosts mark the papers and the tech
+   ticks which board answers each team got (A / B buttons): each tick shows the answer on the projector and adds its points (50/40/30/20/10 by rank) to that
+   team's score straight away (Undo takes it back). If both teams got an answer, both score. Then the next question, for the next person.
+   got[team][question] = indexes of the board answers that team got. step: 'write' (clock running) | 'mark'. */
+const SF_PTS=[50,40,30,20,10];
+function newFast(n){const g=()=>Array.from({length:n},()=>[]);return{q:0,step:'write',got:{A:g(),B:g()},showAll:Array(n).fill(false),secs:60,awarded:false}}
+function ensureFast(){const n=S.data.fast.length;let f=S.fast;
+  if(!f||!f.got||!Array.isArray(f.got.A)||f.choices)f=S.fast=newFast(n);                       // older saved games used a different Sai Five: start it fresh
+  ['A','B'].forEach(t=>{f.got[t]=(f.got[t]||[]).slice(0,n).map(x=>Array.isArray(x)?x:[]);while(f.got[t].length<n)f.got[t].push([])});
+  f.showAll=(f.showAll||[]).slice(0,n);while(f.showAll.length<n)f.showAll.push(false);
+  f.step=f.step==='mark'?'mark':'write';f.secs=Math.max(10,Math.min(300,Number(f.secs)||60));f.q=Math.max(0,Math.min(n-1,Number(f.q)||0));f.awarded=!!f.awarded}
 function fresh(){return {data:deepCopy(DEFAULT_DATA),teams:{A:{name:'Team A',score:0},B:{name:'Team B',score:0}},roundStates:DEFAULT_DATA.rounds.map(r=>({revealed:Array(r.answers.length).fill(false),strikes:0,control:'A',awarded:null})),fast:newFast(DEFAULT_DATA.fast.length),round:0,view:'rounds',lang:'en',sound:true,confirmedSurvey:false,customized:false,presentation:false,timerSeconds:15,timerRunning:false,hist:[],redo:[]};}
 let S=fresh();try{let saved=JSON.parse(localStorage.getItem(STORAGE)||'null');if(saved&&saved.data&&Array.isArray(saved.data.rounds)&&Array.isArray(saved.data.fast)){S={...fresh(),...saved,presentation:false,timerRunning:false};}}catch(e){}
 let timerInterval=null,toastTimeout=null,audioCtx=null;
@@ -134,71 +128,53 @@ function beep(kind){if(!S.sound||window.PROJECTOR_PLAYS)return;try{audioCtx=audi
 function renderScore(){document.getElementById('scorebar').innerHTML=`<div class="team a"><div><div class="teamlabel">${T('Team A','Equipo A')}</div><div class="name">${esc(S.teams.A.name)}</div></div><div class="score">${S.teams.A.score}</div></div><div class="centerbadge"><strong>ONE SAI FAMILY</strong><span>${T('LOVE • CONSCIENCE • MORALITY','AMOR • CONCIENCIA • MORALIDAD')}</span></div><div class="team b"><div><div class="teamlabel">${T('Team B','Equipo B')}</div><div class="name">${esc(S.teams.B.name)}</div></div><div class="score">${S.teams.B.score}</div></div>`}
 function renderNav(){document.getElementById('roundNav').innerHTML=S.data.rounds.map((r,i)=>`<button class="round-pill ${S.view==='rounds'&&S.round===i?'active':''} ${S.roundStates[i]?.awarded?'done':''}" data-round="${i}">${T('Round','Ronda')} ${i+1}${i===0?' · '+T('Fun','Diversión'):''}</button>`).join('')+`<button class="round-pill ${S.view==='fast'?'active':''} ${S.fast.awarded?'done':''}" data-fast="1">⚡ Sai Five</button>`}
 function renderStage(){const el=document.getElementById('gamePanel');if(S.view==='fast'){renderFastStage(el);return}let r=currentRound(),rs=roundState(),cat=L(r.category),title=L(r.title);el.innerHTML=`<div class="question-header"><div class="kicker">${esc(cat)}</div><div class="round-title">${esc(title)} • ${T('ROUND','RONDA')} ${S.round+1}</div><h1 class="question">${esc(L(r.question))}</h1><div class="theme-tags"><span class="tag">${r.multiplier}× ${T('POINTS','PUNTOS')}</span><span class="tag">${T('SURVEY SAYS','LA ENCUESTA DICE')}</span></div></div>${stealBanner(rs)}<div class="answer-list">${r.answers.map((a,i)=>`<button class="answer ${rs.revealed[i]?'revealed':''}" data-answer="${i}" title="${T('Click (or press','Clic (o pulsa')} ${i+1}) ${rs.revealed[i]?T('to hide again','para ocultar'):T('to reveal','para revelar')}" aria-label="${rs.revealed[i]?T('Hide','Ocultar'):T('Reveal','Revelar')} ${i+1}"><span class="rank">${i+1}</span><span class="answer-text">${rs.revealed[i]?esc(L(a)):(peekOn()?'<span class="peek">🔒 '+esc(L(a))+'</span>':'<span class="dots">••••••••</span>')}</span><span class="pts">${rs.revealed[i]?Math.max(0,Number(a.count)||0):(peekOn()?'<span class="peek">'+Math.max(0,Number(a.count)||0)+'</span>':'?')}</span></button>`).join('')}</div><div class="stage-foot"><div class="strikes" aria-label="${rs.strikes} strikes">${[0,1,2].map(i=>`<div class="strike ${i<rs.strikes?'on':''}">✕</div>`).join('')}</div><div class="round-meta">${rs.awarded?T('Awarded to','Asignado a')+' '+esc(S.teams[rs.awarded.team].name)+'<br><strong>+'+rs.awarded.points+'</strong>':T('Revealed points','Puntos revelados')+'<br><strong>'+sumRevealed(S.round)+'</strong>'}</div></div>`;}
-function renderFastStage(el){ensureFast();const f=S.fast,n=S.data.fast.length,team=fTeam(),other=fOther(team),k=f.q,item=S.data.fast[k],play=f.step==='play',secs=fSecs(),mm=String(Math.max(0,S.timerSeconds)).padStart(2,'0');
-  const tn=t=>esc(S.teams[t].name),nextReveal=f.rev[team].findIndex(x=>!x),allRev=nextReveal<0,anyEntered=fAnswered('A')+fAnswered('B')>0;
-  const phases=[[0,'play',T('1 · '+S.teams[f.first].name+' plays','1 · juega '+S.teams[f.first].name)],[0,'reveal',T('2 · Reveal','2 · Mostrar')],[1,'play',T('3 · '+S.teams[fOther(f.first)].name+' plays','3 · juega '+S.teams[fOther(f.first)].name)],[1,'reveal',T('4 · Reveal','4 · Mostrar')],[2,'',T('5 · Result','5 · Resultado')]];
-  const cur=f.awarded?4:f.turn*2+(f.step==='reveal'?1:0);
-  const track=phases.map((p,i)=>`<span class="sf-ph ${i===cur?'on':i<cur?'done':''}">${p[2]}</span>`).join('');
-  const timerBtn=!play||f.awarded?'':S.timerRunning?`<button class="btn" data-sf-timer="toggle">⏸ ${T('Pause','Pausar')}</button>`:(S.timerSeconds>0&&S.timerSeconds<secs?`<button class="btn gold" data-sf-timer="toggle">▶ ${T('Resume','Continuar')}</button>`:`<button class="btn gold" data-sf-timer="start">▶ ${T('Start','Iniciar')} ${secs}s</button>`);
-  const label=f.awarded?T('Sai Five is finished','Sai Five terminó'):play?tn(team)+' '+T('plays — '+secs+' seconds, all '+n+' questions','juega — '+secs+' segundos, '+n+' preguntas'):T('Revealing ','Mostrando ')+tn(team)+T('’s answers','')+(allRev?'':' · '+T('next: question '+(nextReveal+1),'siguiente: pregunta '+(nextReveal+1)));
-  const bar=`<div class="sf-timerbar"><div class="sf-turn ${f.turn===1&&!f.awarded?'second':''}">${label}</div>${play&&!f.awarded?`<div class="timer ${S.timerSeconds<=5?'urgent':''}" id="timerNum">${mm}s</div>${timerBtn}<button class="btn" data-sf-timer="reset" title="${T('Set the clock back','Reiniciar reloj')}">↻ ${secs}s</button>`:''}
-    <label class="sf-set">${T('First team','Primer equipo')} <input type="number" min="10" max="300" data-sf-secs="first" value="${f.secs.first}">s</label><label class="sf-set">${T('Second team','Segundo equipo')} <input type="number" min="10" max="300" data-sf-secs="second" value="${f.secs.second}">s</label>
-    <label class="sf-set chk"><input type="checkbox" data-sf-norepeat="1" ${f.norepeat?'checked':''}> ${T('Second team may not repeat the first team’s answers','El segundo equipo no puede repetir respuestas')}</label></div>`;
-  let body='';
-  if(play&&!f.awarded){
-    const pills=S.data.fast.map((x,i)=>`<button class="sf-pill ${i===k?'on':''} ${f.choices[team][i]!==-2?'done':''}" data-fq-go="${i}" title="${esc(L(x.question))}">${i+1}</button>`).join('');
-    const cur=Number(f.choices[team][k]),said=f.said[team][k]||'',prev=f.turn===1?fCell0(f.first,k):null;
-    body=`<div class="sf-wrap"><div class="sf-pills">${pills}</div><div class="sf-card">
-      <div class="sf-q"><span>${k+1} / ${n}</span>${esc(L(item.question))}</div>
-      <div class="sf-help">${T('Click what the team said and it moves straight to the next question. Wrong or not on the board: “Not on the board”. Skipped one? “Pass” — it comes back at the end if there is time.','Pulsa lo que dijo el equipo y pasa a la siguiente pregunta. Si no está: «No está en el tablero». «Pasar» vuelve al final si hay tiempo.')}</div>
-      ${f.turn===1&&f.norepeat&&prev&&prev.ok?`<div class="sf-warn">${T(esc(S.teams[f.first].name)+' already said “'+esc(prev.t)+'” — it can’t be repeated.','«'+esc(prev.t)+'» ya fue dicha — no se puede repetir.')}</div>`:''}
-      <div class="sf-now ${cur===-1?'bad':cur>=0?'ok':''}">${cur===-2?T('Waiting for '+tn(team)+'’s answer','Esperando respuesta de '+tn(team)):cur>=0?esc(L(item.answers[cur]))+' · <b>'+2*item.answers[cur].count+'</b>':'✕ '+(said?esc(said):T('Not on the board','No está en el tablero'))+' · <b>0</b>'}</div>
-      <div class="sf-grid">${item.answers.map((a,j)=>`<button class="sf-ans ${cur===j?'on':''}" data-fq-pick="${j}"><span>${esc(L(a))}</span><b>${2*a.count}</b></button>`).join('')}</div>
-      <div class="sf-x"><input type="text" maxlength="60" data-fq-said="1" value="${esc(said)}" placeholder="${T('Said something else? Type it, press Enter','¿Dijo otra cosa? Escríbelo y pulsa Enter')}"><button class="sf-ans wrong ${cur===-1?'on':''}" data-fq-pick="-1">✕ ${T('Not on the board','No está en el tablero')}</button><button class="sf-ans pass" data-fq-pass="1">${T('Pass','Pasar')} →</button></div>
-      <div class="sf-bar"><span class="sf-tot">${tn(team)}: ${fAnswered(team)} / ${n} ${T('answered','respondidas')}</span><button class="btn gold big" data-fq-stop="1">${T('Stop the clock & reveal answers','Parar y mostrar respuestas')}</button></div></div></div>`;
-  }else if(!f.awarded){
-    const rows=S.data.fast.map((x,i)=>{const c=fastCell(team,i),r=f.rev[team][i];return`<div class="sf-rrow ${r?(c&&c.ok?'ok':'bad'):''} ${i===nextReveal?'next':''}"><span class="no">${i+1}</span><div class="q">${esc(L(x.question))}</div><div class="a">${c?(c.ok?esc(c.t)+' · <b>'+c.p+'</b>':'✕ '+(c.t?esc(c.t):T('Not on the board','No está'))+' · <b>0</b>'):T('No answer','Sin respuesta')+' · <b>0</b>'}</div><div class="st">${r?T('revealed','mostrada'):T('hidden','oculta')}</div></div>`}).join('');
-    const nextBtn=!allRev?`<button class="btn gold big" data-fq-reveal="1">${T('Reveal answer '+(nextReveal+1),'Mostrar respuesta '+(nextReveal+1))} <kbd>R</kbd></button><button class="btn" data-fq-revealall="1">${T('Reveal all','Mostrar todas')}</button>`
-      :f.turn===0?`<button class="btn teal big" data-fq-nextteam="1">${tn(other)} ${T('plays the same questions','juega las mismas preguntas')} (${f.secs.second}s) →</button>`
-      :`<button class="btn gold big" data-fast-award="1">${T('Finish — award Sai Five points','Terminar — asignar puntos')}</button>`;
-    body=`<div class="sf-wrap"><div class="sf-card"><div class="sf-q"><span>${tn(team)}</span>${T('Right answers','Aciertos')}: ${fastRight(team,true)} · ${T('points','puntos')}: ${fastPoints(team,true)}</div><div class="sf-rrows">${rows}</div><div class="sf-bar">${nextBtn}</div></div></div>`;
-  }else{
+function renderFastStage(el){ensureFast();const f=S.fast,n=S.data.fast.length,k=f.q,item=S.data.fast[k],rows=fastRows(k),write=f.step==='write'&&!f.awarded,mm=String(Math.max(0,S.timerSeconds)).padStart(2,'0'),last=k===n-1;
+  const tn=t=>esc(S.teams[t].name);
+  const label=f.awarded?T('Sai Five is finished','Sai Five terminó'):write?T('Question '+(k+1)+' of '+n+' — both reps write their top 5 · '+f.secs+' seconds','Pregunta '+(k+1)+' de '+n+' — los dos representantes escriben su top 5 · '+f.secs+' segundos'):T('Question '+(k+1)+' of '+n+' — mark what each team got','Pregunta '+(k+1)+' de '+n+' — marca lo que acertó cada equipo');
+  const timerBtn=!write?'':S.timerRunning?`<button class="btn" data-sf-timer="toggle">⏸ ${T('Pause','Pausar')}</button>`:(S.timerSeconds>0&&S.timerSeconds<f.secs?`<button class="btn gold" data-sf-timer="toggle">▶ ${T('Resume','Continuar')}</button>`:`<button class="btn gold" data-sf-timer="start">▶ ${T('Start','Iniciar')} ${f.secs}s</button>`);
+  const bar=`<div class="sf-timerbar"><div class="sf-turn">${label}</div>${write?`<div class="timer ${S.timerSeconds<=5?'urgent':''}" id="timerNum">${mm}s</div>${timerBtn}<button class="btn" data-sf-timer="reset" title="${T('Set the clock back','Reiniciar reloj')}">↻ ${f.secs}s</button>`:''}
+    <label class="sf-set">${T('Seconds per question','Segundos por pregunta')} <input type="number" min="10" max="300" data-sf-secs="1" value="${f.secs}"></label></div>`;
+  const pills=S.data.fast.map((x,i)=>{const any=f.got.A[i].length+f.got.B[i].length>0;return`<button class="sf-pill ${i===k?'on':''} ${any?'done':''}" data-fq-go="${i}" title="${esc(L(x.question))}">${i+1}</button>`}).join('');
+  let body;
+  if(f.awarded){
     const w=fWinner();
-    body=`<div class="sf-wrap"><div class="sf-card sf-final"><div class="sf-fgrid">${['A','B'].map(t=>`<div class="box"><h3>${tn(t)}</h3><div class="big">${fastPoints(t)}</div><div>${fastRight(t)} / ${n} ${T('right','correctas')}</div></div>`).join('')}</div>
-      <div class="winner"><div>${T('FINAL RESULT','RESULTADO FINAL')}</div><h2>${w?tn(w)+' '+T('wins!','gana!'):T('It’s a tie — One Sai Family wins!','¡Empate! ¡Gana la familia Sai!')}</h2></div></div></div>`}
-  el.innerHTML=`<div class="question-header"><div class="kicker">⚡ ${T('LIGHTNING ROUND','RONDA RELÁMPAGO')}</div><h1 class="question">SAI FIVE</h1><div class="theme-tags"><span class="tag">2× ${T('SURVEY POINTS','PUNTOS DE ENCUESTA')}</span><span class="tag">${n} ${T('QUESTIONS','PREGUNTAS')}</span></div></div>
-  <div class="sf-track">${track}</div>${bar}${body}`;}
-const fCell0=(team,i)=>fastCell(team,i);
+    body=`<div class="sf-wrap"><div class="sf-card sf-final"><div class="sf-fgrid">${['A','B'].map(t=>`<div class="box"><h3>${tn(t)}</h3><div class="big">${fastTotal(t)}</div><div>${T('Sai Five points','puntos de Sai Five')} · ${T('total','total')} ${S.teams[t].score}</div></div>`).join('')}</div>
+      <div class="winner"><div>${T('FINAL RESULT','RESULTADO FINAL')}</div><h2>${w?tn(w)+' '+T('wins!','gana!'):T('It’s a tie — One Sai Family wins!','¡Empate! ¡Gana la familia Sai!')}</h2></div></div></div>`;
+  }else if(write){
+    body=`<div class="sf-wrap"><div class="sf-pills">${pills}</div><div class="sf-card"><div class="sf-q"><span>${k+1} / ${n}</span>${esc(L(item.question))}</div>
+      <div class="sf-help">${T('One rep from each team writes down their top 5 answers at the same time. Press Start. The projector shows the question and the clock, and a buzzer sounds at 0. Then the hosts mark the papers and you tick the answers each team got.','Un representante de cada equipo escribe su top 5 al mismo tiempo. Pulsa Iniciar. Al llegar a 0 suena el timbre. Luego marca las respuestas acertadas.')}</div>
+      <div class="sf-bar"><button class="btn" data-fq-go="${k-1}" ${k===0?'disabled':''}>← ${T('Previous','Anterior')}</button><button class="btn gold big" data-fq-stop="1">${T('Time is up — mark the answers','Se acabó el tiempo — marcar respuestas')}</button></div></div></div>`;
+  }else{
+    const sub=t=>fastQPts(t,k),mk=(t,j)=>f.got[t][k].includes(j);
+    body=`<div class="sf-wrap"><div class="sf-pills">${pills}</div><div class="sf-card"><div class="sf-q"><span>${k+1} / ${n}</span>${esc(L(item.question))}</div>
+      <div class="sf-help">${T('Tick the board answers each team got. Each tick shows on the projector at once and adds its points. Both teams can get the same answer. Tick again to remove.','Marca las respuestas que acertó cada equipo. Cada marca se muestra al instante y suma puntos. Pulsa de nuevo para quitar.')}</div>
+      <div class="sf-mrows"><div class="sf-mhead"><span></span><span></span><b>${tn('A')}</b><b>${tn('B')}</b></div>${rows.map((a,j)=>`<div class="sf-mrow ${mk('A',j)||mk('B',j)?'got':''}"><span class="rk">${j+1}</span><span class="an">${esc(L(a))} <em>${SF_PTS[j]}</em></span>
+        <button class="sf-tick ${mk('A',j)?'on':''}" data-fq-tick="A:${j}" aria-pressed="${mk('A',j)}">${mk('A',j)?'✓':''} A</button><button class="sf-tick ${mk('B',j)?'on':''}" data-fq-tick="B:${j}" aria-pressed="${mk('B',j)}">${mk('B',j)?'✓':''} B</button></div>`).join('')}</div>
+      <div class="sf-bar"><button class="btn" data-fq-showall="1">${f.showAll[k]?T('Hide the answers nobody got','Ocultar las no acertadas'):T('Show the answers nobody got','Mostrar las no acertadas')}</button>
+        ${last?`<button class="btn gold big" data-fast-award="1">${T('Finish Sai Five','Terminar Sai Five')}</button>`:`<button class="btn teal big" data-fq-next="1">${T('Next question','Siguiente pregunta')} →</button>`}
+        <span class="sf-tot">${tn('A')} <b>+${sub('A')}</b> · ${tn('B')} <b>+${sub('B')}</b> · Sai Five: ${fastTotal('A')} – ${fastTotal('B')}</span></div></div></div>`;
+  }
+  el.innerHTML=`<div class="question-header"><div class="kicker">⚡ ${T('FINAL ROUND','RONDA FINAL')}</div><h1 class="question">SAI FIVE</h1><div class="theme-tags"><span class="tag">${T('TOP 5 ANSWERS','TOP 5 RESPUESTAS')} · 50 · 40 · 30 · 20 · 10</span><span class="tag">${n} ${T('QUESTIONS','PREGUNTAS')}</span></div></div>${bar}${body}`;}
 /* Sai Five controls */
 const fStop=()=>{S.timerRunning=false;clearInterval(timerInterval)};
-function fNextOpen(from){const f=S.fast,n=S.data.fast.length,t=fTeam();for(let d=1;d<=n;d++){const i=(from+d)%n;if(f.choices[t][i]===-2)return i}return -1}
-function fToReveal(){const f=S.fast;act(T('Stopped the clock — revealing ','Detuvo el reloj — mostrando ')+S.teams[fTeam()].name,()=>{f.step='reveal'});fStop();render()}
-window.fTimeUp=()=>{if(S.view==='fast'&&S.fast&&S.fast.step==='play'&&!S.fast.awarded)fToReveal()};
-document.addEventListener('click',e=>{const b=e.target.closest('[data-fq-pick],[data-fq-go],[data-fq-pass],[data-fq-stop],[data-fq-reveal],[data-fq-revealall],[data-fq-nextteam],[data-sf-timer]');if(!b||S.view!=='fast')return;ensureFast();
-  const f=S.fast,n=S.data.fast.length,k=f.q,team=fTeam();
-  if(b.dataset.fqPick!==undefined){if(f.step!=='play'||f.awarded)return;const v=Number(b.dataset.fqPick),inp=document.querySelector('[data-fq-said]'),said=v===-1&&inp?inp.value.trim().slice(0,60):'';
-    if(f.turn===1&&f.norepeat){const p=fCell0(f.first,k);if(p&&((v>=0&&p.ok&&f.choices[f.first][k]===v)||(v===-1&&said&&!p.ok&&p.t&&p.t.toLowerCase()===said.toLowerCase()))){
-      toast(T(S.teams[f.first].name+' already said that — ask for a different answer','Ya lo dijo '+S.teams[f.first].name+' — pide otra respuesta'));if(window.sendCue)window.sendCue('buzzer');return}}
-    act('Sai Five · '+(k+1)+' · '+S.teams[team].name+': '+(v===-1?'✕ '+(said||T('not on the board','no está')):L(S.data.fast[k].answers[v])),()=>{f.choices[team][k]=v;f.said[team][k]=v===-1?said:''});
-    const nx=fNextOpen(k);if(nx>=0)f.q=nx;render();
-    if(nx<0)toast(T('All questions answered — Stop the clock & reveal','Todas respondidas — para el reloj y muestra'));return}
-  if(b.dataset.fqPass!==undefined){const nx=fNextOpen(k);if(nx>=0&&nx!==k){f.q=nx;render()}return}
-  if(b.dataset.fqGo!==undefined){const i=Number(b.dataset.fqGo);if(i>=0&&i<n&&i!==k){f.q=i;render()}return}
-  if(b.dataset.fqStop!==undefined){fToReveal();return}
-  if(b.dataset.fqReveal!==undefined||b.dataset.fqRevealall!==undefined){const all=b.dataset.fqRevealall!==undefined,i=f.rev[team].findIndex(x=>!x);if(i<0)return;
-    act(T('Revealed ','Mostró ')+(all?T('all of ','todas de '):'#'+(i+1)+' ')+S.teams[team].name,()=>{if(all)f.rev[team].fill(true);else f.rev[team][i]=true});beep('reveal');render();return}
-  if(b.dataset.fqNextteam!==undefined){act(T('Next: ','Siguiente: ')+S.teams[fOther(f.first)].name+T(' plays',' juega'),()=>{f.turn=1;f.step='play';f.q=0});fStop();S.timerSeconds=f.secs.second;render();return}
+function fGoto(i){const f=S.fast;f.q=i;f.step=(f.got.A[i].length+f.got.B[i].length>0)?'mark':'write';fStop();S.timerSeconds=f.secs}
+window.fTimeUp=()=>{if(S.view==='fast'&&S.fast&&S.fast.step==='write'&&!S.fast.awarded){act(T('Time up — marking','Se acabó el tiempo'),()=>{S.fast.step='mark'});render()}};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-fq-tick],[data-fq-go],[data-fq-stop],[data-fq-next],[data-fq-showall],[data-sf-timer]');if(!b||S.view!=='fast')return;ensureFast();
+  const f=S.fast,n=S.data.fast.length,k=f.q;
+  if(b.dataset.fqTick){if(f.awarded)return;const[t,js]=b.dataset.fqTick.split(':'),j=Number(js),g=f.got[t][k],has=g.includes(j),p=SF_PTS[j]||0;
+    act('Sai Five · '+(k+1)+' · '+S.teams[t].name+': '+(has?T('removed ','quitó '):'')+L(fastRows(k)[j]),()=>{if(has){g.splice(g.indexOf(j),1);S.teams[t].score-=p}else{g.push(j);S.teams[t].score+=p}f.step='mark'});
+    fStop();if(!has)beep('reveal');render();return}
+  if(b.dataset.fqStop!==undefined){act(T('Time up — marking','Se acabó el tiempo'),()=>{f.step='mark'});fStop();render();return}
+  if(b.dataset.fqShowall!==undefined){act(T('Toggled the answers nobody got','Cambió las no acertadas'),()=>{f.showAll[k]=!f.showAll[k]});render();return}
+  if(b.dataset.fqNext!==undefined){if(k<n-1){act(T('Next Sai Five question','Siguiente pregunta'),()=>{f.q=k+1;f.step='write'});fStop();S.timerSeconds=f.secs;render()}return}
+  if(b.dataset.fqGo!==undefined){const i=Number(b.dataset.fqGo);if(i>=0&&i<n&&i!==k){fGoto(i);render()}return}
   if(b.dataset.sfTimer==='toggle'){startTimer();render();return}
-  if(b.dataset.sfTimer){fStop();const secs=fSecs();if(b.dataset.sfTimer==='reset'){setTimer(secs);render();return}S.timerSeconds=secs;S.timerRunning=false;startTimer();render()}});
+  if(b.dataset.sfTimer){fStop();if(b.dataset.sfTimer==='reset'){setTimer(f.secs);render();return}S.timerSeconds=f.secs;S.timerRunning=false;startTimer();render()}});
 document.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset||S.view!=='fast')return;ensureFast();
-  if(t.dataset.sfSecs){S.fast.secs[t.dataset.sfSecs]=Math.max(10,Math.min(300,Number(t.value)||60));if(!S.timerRunning&&S.fast.step==='play')S.timerSeconds=fSecs();render();return}
-  if(t.dataset.sfNorepeat){act(t.checked?T('No repeats by the second team','Sin repetir respuestas'):T('Repeats allowed','Repetir permitido'),()=>{S.fast.norepeat=t.checked});render()}});
-document.addEventListener('keydown',e=>{const isSaid=e.target&&e.target.dataset&&e.target.dataset.fqSaid;
-  if(isSaid&&e.key==='Enter'){e.preventDefault();const bt=document.querySelector('[data-fq-pick="-1"]');if(bt)bt.click();return}
-  if(!isSaid&&S.view==='fast'&&(e.key==='r'||e.key==='R')&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!e.target.matches('input,textarea,select')&&!document.getElementById('modalBg')){const bt=document.querySelector('[data-fq-reveal]');if(bt)bt.click()}});
+  if(t.dataset.sfSecs){S.fast.secs=Math.max(10,Math.min(300,Number(t.value)||60));if(!S.timerRunning&&S.fast.step==='write')S.timerSeconds=S.fast.secs;render()}});
 function timerDisplay(){let t=document.getElementById('timerNum');if(t){t.textContent=String(S.timerSeconds).padStart(2,'0')+'s';t.classList.toggle('urgent',S.timerSeconds<=5)}}
 function renderSidebar(){let el=document.getElementById('sidebar');let controls=`<div class="panel"><h3>${T('HOST CONTROLS','CONTROLES DEL PRESENTADOR')}</h3>`+undoBar()+(S.view==='rounds'?`<button class="btn small full ${peekOn()?'active':''}" data-peek="1">👁 ${T('Hidden answers','Respuestas ocultas')}: ${peekOn()?T('shown to you','visibles para ti'):T('hidden','ocultas')}</button>`:'');if(S.view==='rounds'){let rs=roundState(),r=currentRound();controls+=`<div class="field-label">${T('Team in control','Equipo que juega')}</div><div class="control-row"><button class="btn ${rs.control==='A'?'active':''}" data-control="A">${esc(S.teams.A.name)}</button><button class="btn ${rs.control==='B'?'active':''}" data-control="B">${esc(S.teams.B.name)}</button></div>${window.foBox?window.foBox():''}<div class="control-row"><button class="btn red big" data-strike="add" ${rs.strikes>=3?'disabled':''} title="X">✕ ${T('Wrong answer','Respuesta incorrecta')} · ${T('Strike','Fallo')} ${rs.strikes}/3</button></div><div class="control-row"><button class="btn small" data-strike="remove" ${rs.strikes===0?'disabled':''} title="Shift+X">− ${T('Remove a strike','Quitar un fallo')}</button></div><div class="field-label">${T('Award the round','Asignar la ronda')}</div><div class="control-row"><button class="btn teal" data-award="A" ${rs.awarded?'disabled':''} title="A">${T('Award','Asignar')} ${sumRevealed(S.round)} → ${esc(S.teams.A.name)}</button><button class="btn teal" data-award="B" ${rs.awarded?'disabled':''} title="B">${T('Award','Asignar')} ${sumRevealed(S.round)} → ${esc(S.teams.B.name)}</button></div>${rs.awarded?`<div class="awarded-note">✓ ${T('Awarded','Asignado')} +${rs.awarded.points} → <b>${esc(S.teams[rs.awarded.team].name)}</b>. ${T('Wrong team? Press Undo.','¿Equipo equivocado? Pulsa Deshacer.')}</div>`:`<div class="tiny">${T('Points = revealed answers × round multiplier. Keys: A or B.','Puntos = respuestas reveladas × multiplicador. Teclas: A o B.')}</div>`}<div class="control-row"><button class="btn" data-prev="1" ${S.round===0?'disabled':''}>← ${T('Back','Atrás')}</button><button class="btn gold" data-next="1">${T('Next round →','Siguiente →')}</button></div><button class="btn small full" data-reset-round="1">${T('Reset this round','Reiniciar ronda')}</button>`;}
-else{ensureFast();controls+=`<div class="rule-note">${T('Sai Five is the lightning round: the first team gets one clock to get through all the questions, then the second team plays the same questions with less time. Wrong answers score 0. The clock is at the top of the page. Mistakes: Undo.','Sai Five es la ronda relámpago: el primer equipo tiene un reloj para todas las preguntas y luego el segundo juega las mismas con menos tiempo. Errores: Deshacer.')}</div><div class="control-row"><button class="btn teal" data-fast-award="1" ${S.fast.awarded?'disabled':''}>${T('Award Sai Five points','Asignar puntos de Sai Five')}</button></div><button class="btn full" data-fast-reset="1">${T('Reset Sai Five','Reiniciar Sai Five')}</button><div class="control-row"><button class="btn" data-prev="1">← ${T('Back to the last round','Volver a la última ronda')}</button></div>`;}
+else{ensureFast();controls+=`<div class="rule-note">${T('Sai Five: one question at a time. One rep per team writes their top 5 in 60 seconds; the hosts mark the papers and you tick the answers each team got. Points (50/40/30/20/10) are added as you tick. The clock is at the top of the page. Mistakes: Undo.','Sai Five: una pregunta a la vez. Un representante por equipo escribe su top 5 en 60 segundos; marca las respuestas acertadas. Los puntos se suman al marcar. Errores: Deshacer.')}</div><button class="btn full" data-fast-reset="1">${T('Reset Sai Five','Reiniciar Sai Five')}</button><div class="control-row"><button class="btn" data-prev="1">← ${T('Back to the last round','Volver a la última ronda')}</button></div>`;}
 controls+='</div>';
 let time=S.view==='fast'?'':`<div class="panel"><h3>${T('COUNTDOWN','CUENTA REGRESIVA')}</h3><div class="timer-box"><div class="timer ${S.timerSeconds<=5?'urgent':''}" id="timerNum">${String(S.timerSeconds).padStart(2,'0')}s</div><button class="btn gold" data-timer="toggle">${S.timerRunning?T('Pause','Pausar'):T('Start','Iniciar')}</button></div><div class="control-row"><button class="btn small" data-timer="15">15s</button><button class="btn small" data-timer="30">30s</button><button class="btn small" data-timer="60">60s</button><button class="btn small" data-timer="reset">↻</button></div></div>`;
 let source=S.view==='rounds'?SOURCES[currentRound().source]:SOURCES.discourse;
@@ -213,18 +189,14 @@ function revealAnswer(i){if(S.view!=='rounds')return;let rs=roundState();if(i<0|
 function awardRound(team){let rs=roundState();if(rs.awarded){toast(T('Already awarded. Wrong team? Press Undo (Z) first.','Ya asignado. ¿Equipo equivocado? Pulsa Deshacer (Z).'));return}let points=sumRevealed(S.round);
   act(T('Awarded ','Asignó ')+points+' → '+S.teams[team].name,()=>{rs.awarded={team,points};S.teams[team].score+=points});beep('award');render();toast(`${S.teams[team].name}: +${points} ${T('points','puntos')} — ${T('Undo with Z if that was a mistake','Deshaz con Z si fue un error')}`)}
 function resetRound(){act(T('Reset round ','Reinició la ronda ')+(S.round+1),()=>{let rs=roundState();if(rs.awarded)S.teams[rs.awarded.team].score-=rs.awarded.points;S.roundStates[S.round]={revealed:Array(currentRound().answers.length).fill(false),strikes:0,control:'A',awarded:null}});render()}
-function setView(view,round){S.view=view;if(round!==undefined)S.round=round;S.timerRunning=false;if(view==='fast'){ensureFast();S.timerSeconds=fSecs()}else S.timerSeconds=15;render()}
-const fOther=t=>t==='A'?'B':'A';
-const fTeam=()=>{ensureFast();return S.fast.turn===0?S.fast.first:fOther(S.fast.first)};      // the team on the clock
-const fSecs=()=>{ensureFast();return S.fast.turn===0?S.fast.secs.first:S.fast.secs.second};
-const fastCell=(team,i)=>{ensureFast();const f=S.fast,c=Number(f.choices[team][i]);if(isNaN(c)||c===-2)return null;const a=S.data.fast[i].answers[c];return c>=0&&a?{t:a.en,p:2*Math.max(0,Number(a.count)||0),ok:true}:{t:f.said[team][i]||'',p:0,ok:false}};
-function fastPoints(team,onlyRevealed){ensureFast();return S.data.fast.reduce((tot,f,i)=>{if(onlyRevealed&&!S.fast.rev[team][i])return tot;const c=fastCell(team,i);return tot+(c?c.p:0)},0)}
-function fastRight(team,onlyRevealed){ensureFast();return S.data.fast.reduce((n,f,i)=>{if(onlyRevealed&&!S.fast.rev[team][i])return n;const c=fastCell(team,i);return n+(c&&c.ok?1:0)},0)}
-const fAnswered=team=>S.fast.choices[team].filter(c=>c!==-2).length;
-/* who wins Sai Five / the game: more total points, then more Sai Five points, then more right answers */
-function fWinner(){const sa=S.teams.A.score,sb=S.teams.B.score;if(sa!==sb)return sa>sb?'A':'B';const pa=fastPoints('A'),pb=fastPoints('B');if(pa!==pb)return pa>pb?'A':'B';const ra=fastRight('A'),rb=fastRight('B');return ra===rb?null:ra>rb?'A':'B'}
-function awardFast(){if(S.fast.awarded)return;let a=fastPoints('A'),b=fastPoints('B');act(T('Awarded Sai Five: ','Asignó Sai Five: ')+S.teams.A.name+' +'+a+' · '+S.teams.B.name+' +'+b,()=>{S.fast.awards={A:a,B:b};S.teams.A.score+=a;S.teams.B.score+=b;S.fast.awarded=true;S.fast.reveal=true;S.fast.turn=1;S.fast.step='reveal';['A','B'].forEach(t=>S.fast.rev[t].fill(true))});beep('award');render();toast(T('Sai Five points awarded!','¡Puntos de Sai Five asignados!'))}
-function resetFast(){act(T('Reset Sai Five','Reinició Sai Five'),()=>{if(S.fast.awarded){S.teams.A.score-=S.fast.awards.A;S.teams.B.score-=S.fast.awards.B;}S.fast=newFast(S.data.fast.length)});render()}
+function setView(view,round){S.view=view;if(round!==undefined)S.round=round;S.timerRunning=false;if(view==='fast'){ensureFast();S.timerSeconds=S.fast.secs}else S.timerSeconds=15;render()}
+const fastQPts=(team,i)=>{ensureFast();return S.fast.got[team][i].reduce((t,j)=>t+(SF_PTS[j]||0),0)};
+const fastTotal=team=>{ensureFast();return S.data.fast.reduce((t,_,i)=>t+fastQPts(team,i),0)};
+const fastRows=i=>S.data.fast[i].answers.slice(0,5);
+/* the winner is decided by the total score across ALL rounds (Sai Five points are already added to it) */
+function fWinner(){const sa=S.teams.A.score,sb=S.teams.B.score;return sa===sb?null:sa>sb?'A':'B'}
+function awardFast(){ensureFast();if(S.fast.awarded)return;act(T('Finished Sai Five','Terminó Sai Five'),()=>{S.fast.awarded=true;S.fast.step='mark'});beep('award');render();toast(T('Sai Five finished — points are already in the scores','Sai Five terminó'))}
+function resetFast(){act(T('Reset Sai Five','Reinició Sai Five'),()=>{ensureFast();['A','B'].forEach(t=>{S.teams[t].score-=fastTotal(t)});S.fast=newFast(S.data.fast.length)});render();toast(T('Sai Five reset — its points were taken off','Sai Five reiniciado'))}
 function resetGame(){if(!confirm(T('Reset all scores, reveals and round progress? Your survey data will be kept.','¿Reiniciar todas las puntuaciones y rondas? Se conservarán los datos de la encuesta.')))return;let data=S.data,lang=S.lang,sound=S.sound,customized=S.customized,confirmedSurvey=S.confirmedSurvey;S={...fresh(),data,lang,sound,customized,confirmedSurvey};S.roundStates=data.rounds.map(r=>({revealed:Array(r.answers.length).fill(false),strikes:0,control:'A',awarded:null}));S.fast.choices={A:Array(data.fast.length).fill(-1),B:Array(data.fast.length).fill(-1)};render()}
 function startTimer(){S.timerRunning=!S.timerRunning;if(S.timerRunning){clearInterval(timerInterval);timerInterval=setInterval(()=>{if(!S.timerRunning)return;S.timerSeconds=Math.max(0,S.timerSeconds-1);timerDisplay();if(S.timerSeconds===0){S.timerRunning=false;clearInterval(timerInterval);beep('timer');renderSidebar();toast(T('Time!','¡Tiempo!'));if(S.view==='fast'&&window.fTimeUp)window.fTimeUp()}},1000)}else clearInterval(timerInterval);renderSidebar();persist()}
 function setTimer(n){S.timerRunning=false;clearInterval(timerInterval);S.timerSeconds=n;renderSidebar();persist()}
@@ -703,7 +675,7 @@ const short=s=>{s=String(s).replace(/^Name (a|an|one of the|the|something|some)?
 /* ---------- the game's questions ---------- */
 function items(){const a=[];
   S.data.rounds.forEach((r,i)=>a.push({kind:'round',i,r,n:5,optional:r.source==='bhajans'||r.source==='vahinis'||!!(A.sv&&A.sv.questions&&A.sv.questions.filter(q=>q.kind!=='fast')[i]&&A.sv.questions.filter(q=>q.kind!=='fast')[i].optional)}));
-  S.data.fast.forEach((r,i)=>a.push({kind:'fast',i,r,n:4,optional:false}));return a}
+  S.data.fast.forEach((r,i)=>a.push({kind:'fast',i,r,n:5,optional:false}));return a}
 const qLabel=it=>it.kind==='round'?(it.r.category.en||'Round '+(it.i+1)):'Sai Five · Q'+(it.i+1);
 const isPending=it=>it.r.answers.some(a=>/pending survey/.test(a.en));
 
@@ -801,8 +773,9 @@ const totalOf=q=>(A.groups[q]||[]).reduce((s,g)=>s+gN(g),0);
 /* Points: an answer that matches a bank answer ("anchor") starts with the bank's points; a new answer starts from its share of the
    votes; either can be typed over per question (g.pts). The board ranks by points, then by votes. */
 const ptsOf=(gs,g)=>g.pts!=null&&g.pts!==''?Math.max(0,Math.round(Number(g.pts)||0)):(A.pts==='raw'?gN(g):Math.max(1,Math.round(100*gN(g)/Math.max(1,gs.reduce((s,x)=>s+gN(x),0)))));
-const sorted=q=>{const gs=A.groups[q]||[];return gs.slice().sort((a,b)=>ptsOf(gs,b)-ptsOf(gs,a)||gN(b)-gN(a))};
-const points=(q,g)=>ptsOf(A.groups[q]||[],g);
+const isFastQ=q=>{const it=items()[q];return !!it&&it.kind==='fast'};
+const sorted=q=>{const gs=A.groups[q]||[];return isFastQ(q)?gs.slice().sort((a,b)=>gN(b)-gN(a)||String(a.label).localeCompare(String(b.label))):gs.slice().sort((a,b)=>ptsOf(gs,b)-ptsOf(gs,a)||gN(b)-gN(a))};   // Sai Five ranks by votes only
+const points=(q,g)=>isFastQ(q)?(SF_PTS[sorted(q).indexOf(g)]||0):ptsOf(A.groups[q]||[],g);
 function anchorsFor(q){const it=items()[q];return it&&!isPending(it)?it.r.answers.map(a=>({en:a.en,es:a.es,count:a.count})):[]}
 function regroupAll(){A.groups={};Object.keys(A.raw||{}).forEach(q=>{A.groups[q]=buildGroups(A.raw[q],anchorsFor(Number(q)))});
   nextId=1+Math.max(0,...Object.values(A.groups).flat().map(g=>g.id))}
@@ -877,7 +850,8 @@ function gameData(sv){
   const rounds=[],fast=[];
   const ph=n=>Array.from({length:n},(_,i)=>({en:'Answer '+(i+1)+' (pending survey)',es:'Answer '+(i+1)+' (pending survey)',count:Math.max(1,10-i*2)}));
   sv.questions.forEach(q=>{
-    const ans=(q.answers&&q.answers.length>=3)?q.answers.slice(0,q.kind==='fast'?4:5).map(a=>({en:a.en,es:a.es||a.en,count:Number(a.count)||1})):ph(q.kind==='fast'?4:5);
+    let ans=(q.answers&&q.answers.length>=3)?q.answers.slice(0,5).map(a=>({en:a.en,es:a.es||a.en,count:Number(a.count)||1})):ph(5);
+    if(q.kind==='fast')ans=ans.map((a,i)=>Object.assign(a,{count:SF_PTS[i]||10}));   // Sai Five: the top 5 are always worth 50/40/30/20/10
     const base={question:{en:q.en,es:q.en},source:SOURCES[q.source]?q.source:'discourse',answers:ans};
     if(q.kind==='fast')fast.push(base);
     else rounds.push(Object.assign(base,{category:{en:q.category||'Round',es:q.category||'Round'},title:{en:q.title||'',es:q.title||''},multiplier:Number(q.multiplier)||1,cue:{en:q.cue||'',es:q.cue||''}}))});
@@ -944,7 +918,7 @@ function vBank(){
 function vQForm(){const q=A.qf;return`<div class="r0-wrap">${bar()}<div class="r0-card"><h1>${q.id?'Edit question':'Add a question'}</h1>
  <div class="a-form">
   <label class="full">Question<textarea id="qEn" rows="2">${esc(q.en)}</textarea></label>
-  <label>Type<select id="qKind"><option value="round" ${q.kind==='round'?'selected':''}>Main round (top 5 answers)</option><option value="fast" ${q.kind==='fast'?'selected':''}>Sai Five (top 4 answers)</option></select></label>
+  <label>Type<select id="qKind"><option value="round" ${q.kind==='round'?'selected':''}>Main round (top 5 answers)</option><option value="fast" ${q.kind==='fast'?'selected':''}>Sai Five (top 5 answers, worth 50/40/30/20/10)</option></select></label>
   <label>Category / topic<input id="qCat" value="${esc(q.category||'')}" placeholder="e.g. Service"></label>
   <label>Round subtitle<input id="qTitle" value="${esc(q.title||'')}" placeholder="optional"></label>
   <label>Points multiplier<select id="qMult">${[1,2,3].map(n=>`<option ${Number(q.multiplier)===n?'selected':''}>${n}</option>`).join('')}</select></label>
@@ -1007,7 +981,7 @@ function vTabulate(){
  const its=items(),qn=Math.min(A.tabQ,its.length-1),it=its[qn],gs=sorted(qn),total=totalOf(qn);
  const tabs=its.map((x,i)=>`<button class="r0-tab ${i===qn?'on':''}" data-a="tab" data-i="${i}"><b>${i+1}</b><span>${esc(short(x.r.question.en))}</span><i>${totalOf(i)}</i></button>`).join('');
  const rows=gs.map((g,i)=>`<tr class="${i<it.n?'cut-in':'cut-out'}"><td><input type="checkbox" data-a="chk" data-id="${g.id}" ${SEL[g.id]?'checked':''}></td><td class="rk">${i+1}</td>
-  <td><input class="lbl" data-f="label" data-id="${g.id}" value="${esc(g.label)}"></td><td class="n">${gN(g)}</td><td class="n pt"><input class="pt-in ${g.ptsEdited?'edited':''}" type="number" min="0" max="999" step="1" data-f="pts" data-id="${g.id}" value="${points(qn,g)}" title="${g.anchor?'Starts from the bank answer\'s points. ':''}Type to change the points for this question."></td>
+  <td><input class="lbl" data-f="label" data-id="${g.id}" value="${esc(g.label)}"></td><td class="n">${gN(g)}</td><td class="n pt">${isFastQ(qn)?`<b title="Sai Five answers are worth 50, 40, 30, 20, 10 by rank">${points(qn,g)||'—'}</b>`:`<input class="pt-in ${g.ptsEdited?'edited':''}" type="number" min="0" max="999" step="1" data-f="pts" data-id="${g.id}" value="${points(qn,g)}" title="${g.anchor?'Starts from the bank answer\'s points. ':''}Type to change the points for this question.">`}</td>
   <td class="vs">${gN(g)?'':`<span class="r0-chip">From the bank — no audience votes</span> <button class="btn small" data-a="rmgroup" data-id="${g.id}" title="Take this answer off the list">Remove</button> `}${Object.entries(g.v).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span class="r0-v">${esc(k)}${n>1?' ×'+n:''}${Object.keys(g.v).length>1?`<button data-a="split" data-id="${g.id}" data-k="${esc(k)}" title="Move out into its own answer">✕</button>`:''}</span>`).join('')}</td></tr>`).join('');
  const fact=(it.r.source==='bhajans'||it.r.source==='vahinis')?`<div class="r0-chip warn">Factual question — verify titles against the official sources before the game</div>`:'';
  return`<div class="r0-wrap wide">${bar()}<div class="r0-tabbar"><h1>Tabulate &amp; group answers</h1><div class="r0-top-actions">
@@ -1416,8 +1390,8 @@ async function runGame(){await guard(async()=>{
   A.stage='off';persistA();render();paint();toast('Game ready')},'Could not load the game')}
 function csvFor(sv,groupsById,raw){
   const its=sv.questions,L=[['Question','Rank','Answer','Respondents','Percent','Points','On board']];
-  its.forEach((q,i)=>{const all=groupsById[i]||[],gs=all.slice().sort((a,b)=>ptsOf(all,b)-ptsOf(all,a)||gN(b)-gN(a)),tot=gs.reduce((s,g)=>s+gN(g),0),n=q.kind==='fast'?4:5;
-    gs.forEach((g,k)=>L.push([q.en,k+1,g.label,gN(g),Math.round(100*gN(g)/Math.max(1,tot))+'%',ptsOf(all,g),k<n?'yes':'no']))});
+  its.forEach((q,i)=>{const all=groupsById[i]||[],gs=all.slice().sort(q.kind==='fast'?((a,b)=>gN(b)-gN(a)):((a,b)=>ptsOf(all,b)-ptsOf(all,a)||gN(b)-gN(a))),tot=gs.reduce((s,g)=>s+gN(g),0),n=5;
+    gs.forEach((g,k)=>L.push([q.en,k+1,g.label,gN(g),Math.round(100*gN(g)/Math.max(1,tot))+'%',q.kind==='fast'?(SF_PTS[k]||0):ptsOf(all,g),k<n?'yes':'no']))});
   L.push([]);L.push(['RAW ANSWERS']);its.forEach((q,i)=>(raw[i]||[]).forEach(a=>L.push([q.en,'',a])));
   const txt=L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+txt],{type:'text/csv'}));a.download=(sv.name||'survey').replace(/[^\w]+/g,'_')+'_results.csv';a.click()}
@@ -1428,12 +1402,11 @@ async function exportSv(){await guard(async()=>{const raw=(await Cloud.getData(A
 function displayState(){
   const base={teams:{A:{name:S.teams.A.name,score:S.teams.A.score},B:{name:S.teams.B.name,score:S.teams.B.score}},view:S.view,title:A.sv?A.sv.name:'',updatedAt:Date.now(),
     timerSeconds:S.timerSeconds||0,timerRunning:!!S.timerRunning,timerEndsAt:S.timerRunning?Date.now()+(S.timerSeconds||0)*1000:0};
-  if(S.view==='fast'){ensureFast();const f=S.fast,n=S.data.fast.length,team=fTeam(),play=f.step==='play'&&!f.awarded;   // only what has been revealed: never the hidden answers
-    base.fast={n,step:f.awarded?'done':f.step,team,second:f.turn===1,secs:fSecs(),q:f.q,qtext:play?S.data.fast[f.q].question.en:'',answered:fAnswered(team),awarded:!!f.awarded,
-      first:f.first,totals:{A:fastPoints('A',true),B:fastPoints('B',true)},right:{A:fastRight('A',true),B:fastRight('B',true)},
-      winner:f.awarded?fWinner():null,prev:f.turn===1&&play?{team:f.first,points:fastPoints(f.first,true),right:fastRight(f.first,true)}:null,
-      rows:S.data.fast.map((it,i)=>{const r={q:play&&f.turn===0?(i===f.q?it.question.en:''):it.question.en};
-        ['A','B'].forEach(t=>{if(f.rev[t][i]){const c=fastCell(t,i);r[t]=c?{t:c.t,p:c.p,ok:c.ok}:{t:'',p:0,ok:false,none:true}}});return r})}}
+  if(S.view==='fast'){ensureFast();const f=S.fast,n=S.data.fast.length,k=f.q,rows=fastRows(k);   // answers nobody has been given stay hidden
+    base.fast={n,q:k,step:f.awarded?'done':f.step,secs:f.secs,qtext:S.data.fast[k].question.en,
+      answers:(f.step==='mark'||f.awarded)?rows.map((a,j)=>{const A=f.got.A[k].includes(j),B=f.got.B[k].includes(j),shown=A||B||f.showAll[k];return{rank:j+1,p:SF_PTS[j],t:shown?a.en:'',shown,A,B}}):null,
+      sub:{A:fastQPts('A',k),B:fastQPts('B',k)},totals:{A:fastTotal('A'),B:fastTotal('B')},
+      perQ:f.awarded?S.data.fast.map((x,i)=>({q:x.question.en,A:fastQPts('A',i),B:fastQPts('B',i)})):null,winner:f.awarded?fWinner():null}}
   else{const r=S.data.rounds[S.round],rs=S.roundStates[S.round];
     base.round={n:S.round+1,of:S.data.rounds.length,category:r.category.en,question:r.question.en,mult:Number(r.multiplier)||1,
       answers:r.answers.map((a,i)=>rs.revealed[i]?{on:true,t:a.en,p:a.count}:{on:false}),strikes:rs.strikes,control:rs.control,
