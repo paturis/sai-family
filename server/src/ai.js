@@ -7,6 +7,13 @@ const cap = (s) => {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 };
 
+/* Two labels that differ only by case, punctuation, a stop word or a verb/plural ending are one idea
+   ("Seeing Swami in others" = "See swami in others"). The model sometimes emits both; merge them here. */
+const STOP = new Set(['a', 'an', 'the', 'of', 'to', 'in', 'on', 'and', 'with', 'for', 'our', 'your', 'my', 'is', 'be']);
+const stem = (w) => w.length > 4 ? w.replace(/(ing|ed|es|s)$/, '').replace(/([^aeiou])\1$/, '$1') : w.replace(/s$/, '');
+export const labelKey = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w && !STOP.has(w)).map(stem).sort().join(' ');
+
 const GROUP_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -108,7 +115,10 @@ export function createAI({ config, store, db, fetchImpl = (...a) => fetch(...a),
     const truncated = uniq.length > MAX_UNIQUE;
     if (truncated) uniq = uniq.slice(0, MAX_UNIQUE);
 
-    const anch = (Array.isArray(anchors) ? anchors : []).map((a) => String(a && a.en != null ? a.en : a).slice(0, 80)).filter(Boolean).slice(0, 15);
+    const anch = [];
+    for (const a of (Array.isArray(anchors) ? anchors : []).map((a) => String(a && a.en != null ? a.en : a).trim().slice(0, 80)).filter(Boolean)) {
+      if (!anch.some((x) => labelKey(x) === labelKey(a)) && anch.length < 40) anch.push(a);
+    }
     const qtext = String(question || '').slice(0, 300);
 
     const hash = crypto.createHash('sha256').update(JSON.stringify([config.geminiModel, qtext, anch, uniq.map((u) => [u.disp, u.n])])).digest('hex');
@@ -120,7 +130,9 @@ Survey question: "${qtext}"
 Below are the audience's answers (English or Spanish, possibly with typos), each with a number. Group answers that mean the same thing.
 Rules:
 - Every number must appear in exactly one group, or in "discard".
-- Group labels: short (1-4 words), English, Title Case.${anch.length ? ` Preferred labels, to be used exactly whenever an answer fits one: ${JSON.stringify(anch)}. Create a new label only when none fits.` : ''}
+- SAME group only when two answers name the same specific thing, just worded differently: typos, plural/verb form, capitalisation, filler words, Spanish vs English. Examples that ARE the same: "study circle" = "join a study circle" = "attend study circles"; "pray" = "prayer"; "see Swami in others" = "seeing swami in others"; "disicply" = a typo of "discipline".
+- A related but DIFFERENT activity, quality or idea gets its OWN group. Examples that are NOT the same: "study circle" vs "read Sai literature"; "bhajans" vs "meditation"; "service" vs "community service project"; "anger" vs "jealousy". When in doubt, keep them separate. Do not make one broad group that swallows several different things.
+- Group labels: short (1-4 words), English, Title Case, a clean noun or short phrase (fix typos in the label; use the most common clean wording).${anch.length ? ` Preferred labels: ${JSON.stringify(anch)}. Use one exactly, but only for answers that mean the same thing as it, not for answers that are merely a kind of it or a neighbouring idea. Those get their own new label.` : ''}
 - If an answer mixes two ideas, assign it by its main (first) idea.
 - Do not merge genuinely different ideas (for example anger and jealousy).
 - Use "discard" only for answers that are blank, nonsense, off-topic or offensive.
@@ -143,6 +155,7 @@ ${uniq.map((u, i) => `${i}: ${u.disp}`).join('\n')}`;
       idx.forEach((i) => seen.add(i));
       add(cap(g.label) || uniq[idx[0]].disp, idx);
     }
+    if (uniq.length >= 8 && byLabel.size < Math.max(2, uniq.length * 0.12)) throw new HttpError(502, 'ai_collapsed', 'Gemini merged almost everything into a few groups');
     if (seen.size < uniq.length * 0.5) throw new HttpError(502, 'ai_incomplete', 'Gemini did not cover the answers');
 
     // A model that discards a lot is misbehaving: only honour discards when they are a small minority.
@@ -150,8 +163,15 @@ ${uniq.map((u, i) => `${i}: ${u.disp}`).join('\n')}`;
     if (discard.size > uniq.length * 0.25) discard = new Set();
     uniq.forEach((u, i) => { if (!seen.has(i) && !discard.has(i)) add(cap(u.disp), [i]); });
 
-    const groups = [...byLabel.values()].map((g) => {
-      const anchor = anch.find((a) => a.toLowerCase() === g.label.toLowerCase());
+    // merge groups whose labels are the same idea (the model's near-duplicates)
+    const byKey = new Map();
+    for (const g of byLabel.values()) {
+      const k = labelKey(g.label) || g.label.toLowerCase();
+      const hit = byKey.get(k);
+      if (hit) { hit.idx.push(...g.idx); if (g.idx.length > hit.top) { hit.label = g.label; hit.top = g.idx.length; } } else byKey.set(k, { label: g.label, idx: [...g.idx], top: g.idx.length });
+    }
+    const groups = [...byKey.values()].map((g) => {
+      const anchor = anch.find((a) => labelKey(a) === labelKey(g.label));
       const v = {};
       for (const i of g.idx) v[uniq[i].disp] = (v[uniq[i].disp] || 0) + uniq[i].n;
       return { label: anchor || g.label, v };

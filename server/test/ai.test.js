@@ -161,3 +161,18 @@ test('health check: ok, and reports the error when the model fails', async () =>
     assert.match(h.error, /model not found/);
   } finally { await s.close(); }
 });
+
+test('near-duplicate labels from the model are merged (Seeing/See Swami in others, Pray/Prayer)', async () => {
+  const { s, tech, sid } = await setup(() => ({ data: { groups: [
+    { label: 'Prayer', members: [2] }, { label: 'Prayers', members: [3] },
+    { label: 'Seeing Swami in Others', members: [0] }, { label: 'See Swami in others', members: [1] },
+    { label: 'Love', members: [5] }, { label: 'Odd', members: [4, 6] }] } }));
+  try {
+    const r = (await call(tech, sid, { anchors: [{ en: 'Love' }, { en: 'love' }, { en: 'Prayer' }] })).body.r;
+    const labels = r.groups.map((x) => x.label.toLowerCase());
+    assert.equal(new Set(labels).size, labels.length, 'no duplicate labels');
+    const prayer = r.groups.find((x) => x.label === 'Prayer');
+    assert.deepEqual(Object.keys(prayer.v).sort(), ['Prayer', 'pray']);
+    assert.equal(r.groups.filter((x) => /swami/i.test(x.label)).length, 1, 'both Swami wordings in one group');
+  } finally { await s.close(); }
+});
