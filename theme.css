@@ -85,3 +85,12 @@ h1,h2,h3{font-family:var(--font-head);color:var(--navy);font-weight:700;letter-s
 .sssio-logo.corner{position:fixed;left:50%;transform:translateX(-50%);bottom:1vh;width:clamp(36px,6.5vh,76px);height:clamp(36px,6.5vh,76px);z-index:5}
 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* candidate answers from the question bank (tabulate screen) */
+.r0-cands{margin:10px 0 12px;padding:10px 12px;border:1px dashed #cdd6db;border-radius:10px;background:#f7f9fa}
+.r0-cands>div{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.r0-muted{color:#5d6d76;font-size:12px}
+.r0-chipb{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font:600 12.5px/1.4 var(--font,inherit);background:#fff;color:#0d2d3d;border:1px solid #b9c6cd;cursor:pointer}
+.r0-chipb:hover{border-color:#e67e17;background:#fff4e6}
+.r0-chipb.on{background:#e3f3e5;border-color:#a9d4ae;color:#23622b;cursor:default}
+.r0-chipb i{font-style:normal;background:#23622b;color:#fff;border-radius:999px;padding:0 6px;font-size:11px}

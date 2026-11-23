@@ -134,6 +134,26 @@ await tech.waitForSelector('.r0-table', { timeout: 15000 });
 await sleep(300); await snap(proj, 'p3-projector-counting'); await snap(tech, 't3-tech-tabulate');
 check('PROJECTOR "counting the votes" while the tech works', await waitText(proj, /Counting the votes/), waitText.last);
 check('EMCEE told the votes are being counted', await waitText(emcee, /SURVEY COMPLETE[\s\S]*counting the votes/i), waitText.last);
+/* bank candidates + AI merge undo (Gemini stubbed in the page) */
+await tech.evaluate(() => { window.__console.A.tabQ = 0; window.__console.paint(); });
+const candInfo = await tech.evaluate(() => ({ chips: document.querySelectorAll('.r0-cands .r0-chipb').length, adds: document.querySelectorAll('[data-a="addcand"]').length, rows: document.querySelectorAll('.t-tab tbody tr').length }));
+check('TABULATE shows the bank\'s candidate answers as chips', candInfo.chips > 0, JSON.stringify(candInfo));
+const before = candInfo.rows;
+const addable = candInfo.adds > 0;
+if (addable) {
+  await tc(tech, '.r0-cands [data-a="addcand"]');
+  check('TABULATE picking a candidate adds it to the list, flagged as from the bank', await tech.evaluate((n) => document.querySelectorAll('.t-tab tbody tr').length === n + 1 && /From the bank/.test(document.querySelector('.t-tab').textContent), before));
+  await tc(tech, '[data-a="rmgroup"]');
+  check('TABULATE can remove a bank-only answer again', await tech.evaluate((n) => document.querySelectorAll('.t-tab tbody tr').length === n, before));
+} else check('TABULATE (all candidates already on the list)', true);
+const groupsBefore = await tech.evaluate(() => JSON.stringify(window.__console.A.groups[0].map((g) => g.label)));
+await tech.evaluate(() => { window.__console.Cloud.aiGroup = async () => ({ groups: [{ label: 'Everything', v: { x: 3 } }, { label: 'Other', v: { y: 2 } }] }); });
+await tc(tech, '[data-a="aiq"]');
+check('AI merge replaced the groups', await waitFn(tech, () => window.__console.A.groups[0].length === 2 && window.__console.A.groups[0][0].label === 'Everything'));
+check('Undo AI merge button is enabled', await tech.evaluate(() => { const b = document.querySelector('[data-a="aiundo"]'); return !!b && !b.disabled; }));
+await tc(tech, '[data-a="aiundo"]');
+check('Undo AI merge restores the earlier groups exactly', await tech.evaluate((g) => JSON.stringify(window.__console.A.groups[0].map((x) => x.label)) === g, groupsBefore), groupsBefore);
+check('Undo button disabled again once used', await tech.evaluate(() => document.querySelector('[data-a="aiundo"]').disabled));
 await tc(tech, '[data-a="apply"]');
 await tech.waitForSelector('[data-a="begin"]', { timeout: 8000 });
 await sleep(300); await snap(proj, 'p4-projector-gate'); await snap(emcee, 'e3-emcee-gate');
