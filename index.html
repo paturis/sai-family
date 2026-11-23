@@ -705,16 +705,19 @@ function buildGroups(answers,anchors){
   vs.forEach(v=>{const T=toks(v.disp);let g=groups.find(g=>g.toks.some(t=>similar(t,T)));
     if(!g){g={id:nextId++,v:{},toks:[]};groups.push(g)}g.v[v.disp]=(g.v[v.disp]||0)+v.n;g.toks.push(T)});
   return groups.filter(g=>Object.keys(g.v).length).map(g=>{
-    if(g.anchor)return{id:g.id,label:g.anchor.en,es:g.anchor.es||g.anchor.en,v:g.v};
+    if(g.anchor)return{id:g.id,label:g.anchor.en,es:g.anchor.es||g.anchor.en,v:g.v,anchor:true,pts:Number(g.anchor.count)||null};
     const label=bestLabel(g.v),T=toks(label);let es='';
     if(T.length===1&&CANON[T[0]])return{id:g.id,label:CANON[T[0]].en,es:CANON[T[0]].es,v:g.v};
     return{id:g.id,label,es,v:g.v}}).sort((a,b)=>gN(b)-gN(a))}
 
 const gN=g=>Object.values(g.v).reduce((s,x)=>s+x,0);
 const totalOf=q=>(A.groups[q]||[]).reduce((s,g)=>s+gN(g),0);
-const sorted=q=>(A.groups[q]||[]).slice().sort((a,b)=>gN(b)-gN(a));
-const points=(q,g)=>A.pts==='raw'?gN(g):Math.max(1,Math.round(100*gN(g)/Math.max(1,totalOf(q))));
-function anchorsFor(q){const it=items()[q];return it&&!isPending(it)?it.r.answers.map(a=>({en:a.en,es:a.es})):[]}
+/* Points: an answer that matches a bank answer ("anchor") starts with the bank's points; a new answer starts from its share of the
+   votes; either can be typed over per question (g.pts). The board ranks by points, then by votes. */
+const ptsOf=(gs,g)=>g.pts!=null&&g.pts!==''?Math.max(0,Math.round(Number(g.pts)||0)):(A.pts==='raw'?gN(g):Math.max(1,Math.round(100*gN(g)/Math.max(1,gs.reduce((s,x)=>s+gN(x),0)))));
+const sorted=q=>{const gs=A.groups[q]||[];return gs.slice().sort((a,b)=>ptsOf(gs,b)-ptsOf(gs,a)||gN(b)-gN(a))};
+const points=(q,g)=>ptsOf(A.groups[q]||[],g);
+function anchorsFor(q){const it=items()[q];return it&&!isPending(it)?it.r.answers.map(a=>({en:a.en,es:a.es,count:a.count})):[]}
 function regroupAll(){A.groups={};Object.keys(A.raw||{}).forEach(q=>{A.groups[q]=buildGroups(A.raw[q],anchorsFor(Number(q)))});
   nextId=1+Math.max(0,...Object.values(A.groups).flat().map(g=>g.id))}
 /* ---------- AI grouping (Gemini). The key lives only in this browser's localStorage.
@@ -728,7 +731,7 @@ async function aiGroupQServer(q){
   const it=items()[q],anchors=anchorsFor(q);let r;
   try{r=await Cloud.aiGroup({surveyId:A.sv.id,q,question:it.r.question.en,anchors:anchors.map(a=>a.en)})}
   catch(e){if(e.code==='no_answers')return null;throw e}
-  return r.groups.map(g=>{const a=anchors.find(x=>String(x.en).toLowerCase()===String(g.label).toLowerCase());return{id:nextId++,label:a?a.en:g.label,es:a?(a.es||a.en):g.label,v:g.v}})}
+  return r.groups.map(g=>{const a=anchors.find(x=>String(x.en).toLowerCase()===String(g.label).toLowerCase());return a?{id:nextId++,label:a.en,es:a.es||a.en,v:g.v,anchor:true,pts:Number(a.count)||null}:{id:nextId++,label:g.label,es:g.label,v:g.v}})}
 /* Warm the server's cache as soon as a question closes, so "AI group" at tabulate time is instant. */
 function aiPrefetch(q){if(Cloud.mode!=='server'||!A.sv||!items()[q])return;
   Cloud.aiGroup({surveyId:A.sv.id,q,question:items()[q].r.question.en,anchors:anchorsFor(q).map(a=>a.en)}).catch(()=>{})}
@@ -766,7 +769,7 @@ ${uniq.map((u,i)=>i+': '+u.disp).join('\n')}`;
   const dis=new Set((data.discard||[]).filter(Number.isInteger));
   uniq.forEach((u,i)=>{if(seen.has(i)||dis.has(i))return;const label=cap(u.disp),k=label.toLowerCase();(byLabel[k]=byLabel[k]||{label,idx:[]}).idx.push(i)});
   return Object.values(byLabel).map(g=>{const a=anchors.find(x=>String(x.en).toLowerCase()===g.label.toLowerCase()),v={};g.idx.forEach(i=>{v[uniq[i].disp]=(v[uniq[i].disp]||0)+uniq[i].n});
-    return{id:nextId++,label:a?a.en:g.label,es:a?(a.es||a.en):g.label,v}}).sort((a,b)=>gN(b)-gN(a))}
+    return a?{id:nextId++,label:a.en,es:a.es||a.en,v,anchor:true,pts:Number(a.count)||null}:{id:nextId++,label:g.label,es:g.label,v}}).sort((a,b)=>gN(b)-gN(a))}
 async function aiGroupRun(qs){
   if(A.aiBusy)return;if(Cloud.mode!=='server'&&!aiCfg().key&&!aiSetup())return;
   A.aiBusy=true;const fails=[],snap={};let done=0;
@@ -912,13 +915,13 @@ function candBar(qn,it){
  const cands=isPending(it)?[]:it.r.answers;if(!cands.length)return'';
  const gs=A.groups[qn]||[],has=c=>gs.some(g=>String(g.label).toLowerCase()===String(c.en).toLowerCase()),off=cands.filter(c=>!has(c));
  return`<div class="r0-cands"><b>Answers from the question bank</b> <span class="r0-muted">— click to add one to the list (it stays on the board even if nobody said it, and the AI uses it as the preferred wording)</span><div>`+
-  cands.map(c=>{const g=gs.find(g=>String(g.label).toLowerCase()===String(c.en).toLowerCase());return g?`<span class="r0-chipb on">✓ ${esc(c.en)}<i>${gN(g)}</i></span>`:`<button class="r0-chipb" data-a="addcand" data-l="${esc(c.en)}">+ ${esc(c.en)}</button>`}).join('')+
+  cands.map(c=>{const g=gs.find(g=>String(g.label).toLowerCase()===String(c.en).toLowerCase());return g?`<span class="r0-chipb on">✓ ${esc(c.en)}<i>${gN(g)}</i></span>`:`<button class="r0-chipb" data-a="addcand" data-l="${esc(c.en)}">+ ${esc(c.en)} · ${Number(c.count)||0} pts</button>`}).join('')+
   (off.length>1?`<button class="btn small" data-a="addcand" data-l="*">+ Add all ${off.length}</button>`:'')+`</div></div>`}
 function vTabulate(){
  const its=items(),qn=Math.min(A.tabQ,its.length-1),it=its[qn],gs=sorted(qn),total=totalOf(qn);
  const tabs=its.map((x,i)=>`<button class="r0-tab ${i===qn?'on':''}" data-a="tab" data-i="${i}"><b>${i+1}</b><span>${esc(short(x.r.question.en))}</span><i>${totalOf(i)}</i></button>`).join('');
  const rows=gs.map((g,i)=>`<tr class="${i<it.n?'cut-in':'cut-out'}"><td><input type="checkbox" data-a="chk" data-id="${g.id}" ${SEL[g.id]?'checked':''}></td><td class="rk">${i+1}</td>
-  <td><input class="lbl" data-f="label" data-id="${g.id}" value="${esc(g.label)}"></td><td class="n">${gN(g)}</td><td class="n pt">${points(qn,g)}</td>
+  <td><input class="lbl" data-f="label" data-id="${g.id}" value="${esc(g.label)}"></td><td class="n">${gN(g)}</td><td class="n pt"><input class="pt-in ${g.ptsEdited?'edited':''}" type="number" min="0" max="999" step="1" data-f="pts" data-id="${g.id}" value="${points(qn,g)}" title="${g.anchor?'Starts from the bank answer\'s points. ':''}Type to change the points for this question."></td>
   <td class="vs">${gN(g)?'':`<span class="r0-chip">From the bank — no audience votes</span> <button class="btn small" data-a="rmgroup" data-id="${g.id}" title="Take this answer off the list">Remove</button> `}${Object.entries(g.v).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span class="r0-v">${esc(k)}${n>1?' ×'+n:''}${Object.keys(g.v).length>1?`<button data-a="split" data-id="${g.id}" data-k="${esc(k)}" title="Move out into its own answer">✕</button>`:''}</span>`).join('')}</td></tr>`).join('');
  const fact=(it.r.source==='bhajans'||it.r.source==='vahinis')?`<div class="r0-chip warn">Factual question — verify titles against the official sources before the game</div>`:'';
  return`<div class="r0-wrap wide">${bar()}<div class="r0-tabbar"><h1>Tabulate &amp; group answers</h1><div class="r0-top-actions">
@@ -927,8 +930,8 @@ function vTabulate(){
  <div class="r0-tabs">${tabs}</div>
  <div class="r0-card"><div class="r0-qline"><b>${qn+1}.</b> ${esc(it.r.question.en)} <span class="r0-chip">${total} answers · ${gs.length} groups · top ${it.n} go on the board${it.r.multiplier>1?' · ×'+it.r.multiplier+' round':''}</span> ${fact}</div>
  ${candBar(qn,it)}
- <div class="r0-tablewrap"><table class="r0-table t-tab"><colgroup><col class="c-chk"><col class="c-rk"><col class="c-ans"><col class="c-n"><col class="c-n"><col></colgroup><thead><tr><th></th><th>#</th><th>Answer</th><th class="n">Resp.</th><th class="n">Points</th><th>Variants grouped here (✕ moves one out)</th></tr></thead><tbody>${rows||'<tr><td colspan="6">No answers collected for this question.</td></tr>'}</tbody></table></div>
- <div class="r0-btns"><button class="btn" data-a="merge">Merge checked groups</button><button class="btn" data-a="add">+ Add an answer manually</button><button class="btn" data-a="regroupq">Regroup this question</button><button class="btn gold" data-a="aiq" ${A.aiBusy?'disabled':''}>✨ AI group this question</button></div></div>
+ <div class="r0-tablewrap"><table class="r0-table t-tab"><colgroup><col class="c-chk"><col class="c-rk"><col class="c-ans"><col class="c-n"><col class="c-n"><col></colgroup><thead><tr><th></th><th>#</th><th>Answer</th><th class="n">Resp.</th><th class="n" title="Editable">Points ✎</th><th>Variants grouped here (✕ moves one out)</th></tr></thead><tbody>${rows||'<tr><td colspan="6">No answers collected for this question.</td></tr>'}</tbody></table></div>
+ <div class="r0-btns"><button class="btn" data-a="merge">Merge checked groups</button><button class="btn" data-a="add">+ Add an answer manually</button><button class="btn" data-a="ptsreset" title="Bank answers back to their bank points; the rest from the votes">↺ Reset points</button><button class="btn" data-a="regroupq">Regroup this question</button><button class="btn gold" data-a="aiq" ${A.aiBusy?'disabled':''}>✨ AI group this question</button></div></div>
  <div class="r0-btns end"><button class="btn gold big" data-a="apply">Load these results into the game →</button></div></div>`}
 function vGate(){return`<div class="r0-wrap">${bar()}<div class="r0-gate"><div class="r0-big">Round 0 complete<br><span>Thank you, audience!</span></div>
  <p class="r0-p">The survey board is loaded. Please invite the contestants into the hall.</p><div class="r0-big gold">Contestants, please enter!</div>
@@ -1325,9 +1328,9 @@ async function runGame(){await guard(async()=>{
     S=Object.assign(fresh(),g.S,{presentation:false,timerRunning:false,lang:'en'})}
   A.stage='off';persistA();render();paint();toast('Game ready')},'Could not load the game')}
 function csvFor(sv,groupsById,raw){
-  const its=sv.questions,L=[['Question','Rank','Answer','Respondents','Percent','On board']];
-  its.forEach((q,i)=>{const gs=(groupsById[i]||[]).slice().sort((a,b)=>gN(b)-gN(a)),tot=gs.reduce((s,g)=>s+gN(g),0),n=q.kind==='fast'?4:5;
-    gs.forEach((g,k)=>L.push([q.en,k+1,g.label,gN(g),Math.round(100*gN(g)/Math.max(1,tot))+'%',k<n?'yes':'no']))});
+  const its=sv.questions,L=[['Question','Rank','Answer','Respondents','Percent','Points','On board']];
+  its.forEach((q,i)=>{const all=groupsById[i]||[],gs=all.slice().sort((a,b)=>ptsOf(all,b)-ptsOf(all,a)||gN(b)-gN(a)),tot=gs.reduce((s,g)=>s+gN(g),0),n=q.kind==='fast'?4:5;
+    gs.forEach((g,k)=>L.push([q.en,k+1,g.label,gN(g),Math.round(100*gN(g)/Math.max(1,tot))+'%',ptsOf(all,g),k<n?'yes':'no']))});
   L.push([]);L.push(['RAW ANSWERS']);its.forEach((q,i)=>(raw[i]||[]).forEach(a=>L.push([q.en,'',a])));
   const txt=L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+txt],{type:'text/csv'}));a.download=(sv.name||'survey').replace(/[^\w]+/g,'_')+'_results.csv';a.click()}
@@ -1446,14 +1449,15 @@ document.addEventListener('click',async e=>{
     case 'chk':SEL[b.dataset.id]=b.checked;return;
     case 'refresh':if(confirm('Reload answers from the saved results and regroup every question? Your manual edits will be replaced.'))guard(async()=>{const raw=await Cloud.getData(A.sv.id,'raw');A.raw=raw?raw.answers:{};regroupAll();saveGroupsSoon();paint()},'Could not reload');return;
     case 'csv':return csvFor(A.sv,A.groups,A.raw||{});
+    case 'ptsreset':{const bank=anchorsFor(qn);(A.groups[qn]||[]).forEach(g=>{const a=g.anchor&&bank.find(x=>String(x.en).toLowerCase()===String(g.label).toLowerCase());g.pts=a?(Number(a.count)||null):null;delete g.ptsEdited});saveGroupsSoon();return paint()}
     case 'addcand':{const it=items()[qn],gs=A.groups[qn]=A.groups[qn]||[],l=b.dataset.l;
       (l==='*'?it.r.answers:it.r.answers.filter(c=>c.en===l)).filter(c=>!gs.some(g=>String(g.label).toLowerCase()===String(c.en).toLowerCase()))
-        .forEach(c=>gs.push({id:nextId++,label:c.en,es:c.es||c.en,v:{},bank:true}));saveGroupsSoon();return paint()}
+        .forEach(c=>gs.push({id:nextId++,label:c.en,es:c.es||c.en,v:{},bank:true,anchor:true,pts:Number(c.count)||null}));saveGroupsSoon();return paint()}
     case 'rmgroup':{const gs=A.groups[qn],g=gs.find(x=>x.id===Number(b.dataset.id));if(g&&!gN(g)){A.groups[qn]=gs.filter(x=>x!==g);saveGroupsSoon();paint()}return}
     case 'aiundo':{const u=(A.aiUndo||[]).shift();if(!u)return;Object.entries(u.groups).forEach(([q,gs])=>{A.groups[q]=gs});
       SEL={};A.aiMsg='Undid the AI merge (Q'+u.qs.map(x=>x+1).join(', Q')+')';saveGroupsSoon();return paint()}
     case 'merge':{const ids=Object.keys(SEL).filter(k=>SEL[k]).map(Number),gs=A.groups[qn];if(ids.length<2){alert('Tick at least two groups to merge.');return}
-      const sel=gs.filter(g=>ids.includes(g.id)).sort((x,y)=>gN(y)-gN(x)),t=sel[0];sel.slice(1).forEach(g=>Object.entries(g.v).forEach(([k,n])=>t.v[k]=(t.v[k]||0)+n));
+      const sel=gs.filter(g=>ids.includes(g.id)).sort((x,y)=>gN(y)-gN(x)),t=sel.find(g=>g.anchor)||sel[0];sel.slice(1).forEach(g=>Object.entries(g.v).forEach(([k,n])=>t.v[k]=(t.v[k]||0)+n));
       A.groups[qn]=gs.filter(g=>g===t||!ids.includes(g.id));SEL={};saveGroupsSoon();return paint()}
     case 'split':{const gs=A.groups[qn],g=gs.find(x=>x.id===Number(b.dataset.id)),k=b.dataset.k;if(!g||!(k in g.v))return;const n=g.v[k];delete g.v[k];gs.push({id:nextId++,label:cap(k),es:'',v:{[k]:n}});saveGroupsSoon();return paint()}
     case 'add':{const label=prompt('Answer:');if(!label)return;const n=Math.max(1,Number(prompt('How many respondents gave this answer?','5'))||1);A.groups[qn]=A.groups[qn]||[];A.groups[qn].push({id:nextId++,label:cap(label),es:'',v:{[label]:n}});saveGroupsSoon();return paint()}
@@ -1480,6 +1484,7 @@ document.addEventListener('change',e=>{const t=e.target;if(!root()||!root().cont
   if(t.id==='st'){A.form.name=$('svName').value;A.form.tag=t.value;paint();return}
   if(t.id==='gt'){A.gfilt.tag=t.value;paint();return}
   if(t.id==='gst'){A.gform.name=$('gName').value;A.gform.tag=t.value;paint();return}
+  if(t.dataset.f==='pts'){const g=(A.groups[A.tabQ]||[]).find(x=>x.id===Number(t.dataset.id));if(g){const v=t.value.trim();g.pts=v===''?null:Math.max(0,Math.round(Number(v)||0));g.ptsEdited=v!=='';saveGroupsSoon();paint()}return}
   if(t.dataset.f){const g=(A.groups[A.tabQ]||[]).find(x=>x.id===Number(t.dataset.id));if(g){g[t.dataset.f]=t.value;saveGroupsSoon()}return}
   if(t.dataset.a==='teamrole'){const em=t.dataset.e,role=t.value;guard(async()=>{await Cloud.saveTeam(em,role);A.team=await Cloud.listTeam();A.status=em+' is now '+role+'.';paint()},'Could not change role');return}
   if(t.dataset.a==='pts'){A.pts=t.value;persistA();saveGroupsSoon();paint();return}

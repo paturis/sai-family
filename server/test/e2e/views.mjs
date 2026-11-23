@@ -171,6 +171,22 @@ check('Undo AI merge button is enabled', await tech.evaluate(() => { const b = d
 await tc(tech, '[data-a="aiundo"]');
 check('Undo AI merge restores the earlier groups exactly', await tech.evaluate((g) => JSON.stringify(window.__console.A.groups[0].map((x) => x.label)) === g, groupsBefore), groupsBefore);
 check('Undo button disabled again once used', await tech.evaluate(() => document.querySelector('[data-a="aiundo"]').disabled));
+/* anchors carry the bank's points; new answers start from the votes; points are editable per question and rank the board */
+await tc(tech, '.r0-cands [data-a="addcand"]');
+const anchorInfo = await tech.evaluate(() => { const g = window.__console.A.groups[0].find((x) => x.bank), bank = window.__console.items()[0].r.answers; return g && { anchor: g.anchor, pts: g.pts, ok: bank.some((b) => b.en === g.label && Number(b.count) === Number(g.pts)) }; });
+check('ANCHORS: a bank answer you pick comes with the bank\'s points', !!anchorInfo && anchorInfo.anchor === true && anchorInfo.ok, JSON.stringify(anchorInfo));
+await tc(tech, '[data-a="rmgroup"]');
+await tech.evaluate(() => { const A = window.__console.A, bank = window.__console.items()[0].r.answers; window.__console.Cloud.aiGroup = async () => ({ groups: [{ label: bank[1].en, v: { zzz: 2 } }, { label: 'Brand New Idea', v: { yyy: 1 } }] }); });
+await tc(tech, '[data-a="aiq"]');
+const mapped = await waitFn(tech, () => window.__console.A.groups[0].some((g) => g.label === 'Brand New Idea'));
+const mappedInfo = await tech.evaluate(() => { const A = window.__console.A, bank = window.__console.items()[0].r.answers, g = A.groups[0]; const a = g.find((x) => x.label === bank[1].en), n = g.find((x) => x.label === 'Brand New Idea'); return { a: a && [a.anchor, a.pts, Number(bank[1].count)], n: n && [!!n.anchor, n.pts] }; });
+check('AI MERGE: answers that fit a bank answer join it (with its points); the rest become new answers (points from votes)', mapped && mappedInfo.a[0] === true && mappedInfo.a[1] === mappedInfo.a[2] && mappedInfo.n[0] === false && !mappedInfo.n[1], JSON.stringify(mappedInfo));
+await tc(tech, '[data-a="aiundo"]');
+await tech.evaluate(() => { const i = document.querySelector('.t-tab .pt-in'); i.value = '77'; i.dispatchEvent(new Event('change', { bubbles: true })); });
+check('POINTS: typing a number sets the points for that answer and it ranks first', await waitFn(tech, () => { const i = document.querySelector('.t-tab .pt-in'); return i && i.value === '77' && i.classList.contains('edited'); }));
+await tc(tech, '[data-a="ptsreset"]');
+check('POINTS: Reset points restores the bank / vote points', await waitFn(tech, () => !document.querySelector('.t-tab .pt-in.edited') && document.querySelector('.t-tab .pt-in').value !== '77'));
+
 await tc(tech, '[data-a="apply"]');
 await tech.waitForSelector('[data-a="begin"]', { timeout: 8000 });
 check('URL: the gate is /live/ID/gate', await waitFn(tech, () => /\/gate$/.test(location.pathname)), await hash());

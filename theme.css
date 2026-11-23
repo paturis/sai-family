@@ -94,3 +94,6 @@ h1,h2,h3{font-family:var(--font-head);color:var(--navy);font-weight:700;letter-s
 .r0-chipb:hover{border-color:#e67e17;background:#fff4e6}
 .r0-chipb.on{background:#e3f3e5;border-color:#a9d4ae;color:#23622b;cursor:default}
 .r0-chipb i{font-style:normal;background:#23622b;color:#fff;border-radius:999px;padding:0 6px;font-size:11px}
+.pt-in{width:64px;text-align:right;font:700 14px/1.2 var(--font,inherit);padding:5px 6px;border:1px solid #cdd6db;border-radius:7px;background:#fff;color:#0d2d3d}
+.pt-in:focus{outline:none;border-color:#288abb;box-shadow:0 0 0 3px rgba(40,138,187,.22)}
+.pt-in.edited{border-color:#e67e17;background:#fff4e6}

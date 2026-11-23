@@ -111,6 +111,15 @@ The projector then shows who buzzed first with the buzz-in sound, that team is *
 **Fallback:** if a phone fails, press "Team A first" or "Team B first" on the tech console or the emcee page: it does the same thing by
 hand. "Reset" closes the buzzers. This needs the self-hosted server.
 
+### Answers and points when you tabulate
+The bank's sample answers for a question are its **primary answers (anchors)**, each with the points you gave it ("answer | points").
+When you group the audience's answers (standard grouping or ✨ AI), each one is first tried against the anchors; what fits joins that
+anchor and the group keeps the bank's points. What fits none becomes a **new answer**, whose points start from its share of the votes
+(the "Points" menu chooses % or raw count for those). Anchors nobody said appear as chips ("+ Answer · 30 pts") to add if you want them on
+the board anyway. **Every Points box is editable per question**: type a number and press Enter or Tab; the board is ranked by points, then by
+votes. **↺ Reset points** puts anchors back to the bank's points and the rest back to the votes. **↶ Undo AI merge** restores the
+groups from before the last AI run. The CSV export includes the points.
+
 ### Addresses (tech console)
 The tech console has real addresses that change as you move: `/sessions`, `/questions`, `/team`, `/sessions/ID`, `/live/ID/lobby`,
 `/live/ID/question/3`, `/live/ID/tabulate/2`, `/live/ID/gate`, `/live/ID/board/round/2`. Reload, bookmarks and shared links open the right
