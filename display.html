@@ -455,7 +455,15 @@ function drawStage(n){
   else if(n==='thanks')h=centered(logo+'<h1 class="big">Thank you!</h1><p class="sub">The game begins shortly.</p>');
   app.innerHTML=h;
   if(n==='question')qT=setInterval(function(){var e=document.getElementById('qt');if(e){var l=qLeft();e.textContent=l;e.className='qtime'+(l<=10?' u':'');if(l>5)tickAt=-1;else if(l>0&&l!==tickAt){tickAt=l;snd('tick')}}},300)}
-function drawFo(){var el=document.getElementById('fo');if(!el)return;var f=L&&L.fo;
+var foSoundKey=null;
+/* The face-off sounds follow what is ON SCREEN: whenever the overlay shows a new state, its sound plays once (never on the first
+   document after the page opens, so a reload does not replay an old buzz). */
+function foSound(f){
+  var key=f?f.id+'|'+f.state:'';
+  if(foSoundKey===null){foSoundKey=key;return}
+  if(key===foSoundKey)return;foSoundKey=key;
+  if(f&&f.state==='won')snd('buzzin');else if(f&&f.state==='open')snd('faceoff')}
+function drawFo(){var el=document.getElementById('fo');if(!el||!L)return;var f=L.fo;foSound(f);
   if(!f||(f.state!=='ready'&&f.state!=='open'&&f.state!=='won')){el.className='';el.innerHTML='';return}
   var nm=f.names||{A:'Team A',B:'Team B'},w=f.state==='won'?f.winner:null;
   var tm=function(k){return '<div class="tm '+k+(w===k?' win':'')+'"><small>TEAM '+k+'</small><b>'+esc(nm[k])+'</b></div>'};
@@ -493,8 +501,7 @@ function soundForDoc(p,d){
   if(p&&p.timerRunning&&!d.timerRunning&&d.timerSeconds===0)snd('timeup')}
 function soundForLive(p,d){
   if(!d)return;
-  var pf=p&&p.fo,nf=d.fo;
-  if(p&&nf&&(nf.state==='open'||nf.state==='won')&&(!pf||pf.id!==nf.id||pf.state!==nf.state)){snd(nf.state==='won'?'buzzin':'faceoff')}
+
   if(p&&d.mode!=='buzzer'){
     if(d.phase==='open'&&(p.phase!=='open'||p.q!==d.q))snd('sting');
     if(p.phase==='open'&&d.phase==='closed'&&p.q===d.q)snd('timeup')}

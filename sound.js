@@ -145,9 +145,10 @@
     },
     /* a team buzzed in: a sharp, loud buzz-in with a bell on top */
     buzzin: function (c, o, t) {
-      tone(c, o, t, hz('A3'), 0.32, 'sawtooth', 0.3, { lp: 1800 });
-      tone(c, o, t, hz('A3') * 1.5, 0.32, 'square', 0.14, { lp: 1800 });
-      noise(c, o, t, 0.05, 0.25, { freq: 3000, q: 0.8 });
+      tone(c, o, t, hz('A3'), 0.34, 'sawtooth', 0.34, { lp: 2200 });
+      tone(c, o, t, hz('A4'), 0.34, 'square', 0.2, { lp: 2600 });
+      tone(c, o, t, hz('E5'), 0.34, 'square', 0.12, { lp: 2600 });
+      noise(c, o, t, 0.06, 0.3, { freq: 3000, q: 0.8 });
       tone(c, o, t + 0.2, hz('E6'), 1.0, 'sine', 0.24, { release: 0.6 });
       tone(c, o, t + 0.2, hz('E7'), 0.5, 'sine', 0.08, { release: 0.3 });
     },
