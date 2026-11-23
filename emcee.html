@@ -407,12 +407,12 @@ function game(){
   var A=S.teams.A,Bt=S.teams.B,view=S.view,rs=S.roundStates&&S.roundStates[S.round],ctl=view==='rounds'&&rs?rs.control:null;
   var h='<div class="score"><div class="team'+(ctl==='A'?' ctl':'')+'"><b>'+esc(A.name)+(ctl==='A'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+A.score+'</span></div><div class="team'+(ctl==='B'?' ctl':'')+'"><b>'+esc(Bt.name)+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</b><span>'+Bt.score+'</span></div></div>';
   if(view==='fast'){
-    h+='<div class="card"><div class="cat">⚡ SAI FIVE · '+S.data.fast.length+' QUESTIONS</div><div style="margin-top:8px">'+
+    var FF=S.fast||{},who=(FF.turn===1?(FF.first==='B'?A:Bt):(FF.first==='B'?Bt:A));
+    h+='<div class="card"><div class="cat">⚡ SAI FIVE · LIGHTNING ROUND · '+(FF.awarded?'FINISHED':esc(who.name)+(FF.step==='reveal'?' · REVEALING':' PLAYING · '+((FF.secs||{})[FF.turn===1?'second':'first']||60)+' SECONDS'))+'</div><div style="margin-top:8px">'+
       S.data.fast.map(function(f,i){
         var F=S.fast||{},ch=F.choices||{},sd=F.said||{},cur=F.q||0,pk=function(t,nm){var c=(ch[t]||[])[i];if(c==null||c===-2)return '';
           return '<div class="a"><b>'+esc(nm)+':</b> '+(c>=0&&f.answers[c]?esc(f.answers[c].en)+' ('+2*f.answers[c].count+' pts)':'✕ '+esc((sd[t]||[])[i]||'not on the board')+' (0)')+'</div>'};
-        var fi=(F.first&&F.first[i])||(i%2?'B':'A'),done=F.rev&&F.rev[fi]&&F.rev[fi][i];
-        return '<div class="fq'+(i===cur?' cur':'')+'"><div class="t">'+(i+1)+'. '+esc(f.question.en)+(done?' ✓':'')+'</div><div class="a"><b>'+esc(S.teams[fi].name)+' answers first</b></div><div class="a">'+f.answers.map(function(a){return esc(a.en)+' ('+2*a.count+')'}).join(' · ')+'</div>'+pk('A',A.name)+pk('B',Bt.name)+'</div>'}).join('')+'</div>'+
+        return '<div class="fq'+(i===cur&&F.step!=='reveal'?' cur':'')+'"><div class="t">'+(i+1)+'. '+esc(f.question.en)+'</div><div class="a">'+f.answers.map(function(a){return esc(a.en)+' ('+2*a.count+')'}).join(' · ')+'</div>'+pk('A',A.name)+pk('B',Bt.name)+'</div>'}).join('')+'</div>'+
       (S.fast.awarded?'<div class="ok">Points awarded: '+esc(A.name)+' +'+S.fast.awards.A+' · '+esc(Bt.name)+' +'+S.fast.awards.B+'</div>':'')+'</div>';
   }else{
     var r=S.data.rounds[S.round];

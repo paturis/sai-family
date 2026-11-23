@@ -408,3 +408,15 @@ body.presentation .side{display:none}
 .sf-col h3 em{display:block;margin-top:2px;font:700 11px var(--font,inherit);letter-spacing:.1em;color:#cfdde4;font-style:normal;text-transform:none}
 .sf-col.turn{outline:2px solid var(--orange,#e67e17);outline-offset:6px;border-radius:10px}.sf-col.wait{opacity:.55}
 .sf-q .btn.small{float:right;margin-left:10px}
+/* Sai Five lightning round */
+.sf-track{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:12px 26px 0}
+.sf-ph{padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.25);font:700 12px var(--font,inherit);color:#cfdde4}.sf-ph.on{background:var(--orange,#e67e17);border-color:var(--orange,#e67e17);color:#0d2d3d}.sf-ph.done{background:#2e9b4f;border-color:#2e9b4f;color:#fff}
+.sf-turn.second{background:#8a4b0f}
+.sf-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.sf-grid .sf-ans{margin:0}
+.sf-x{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px;align-items:center}.sf-x input{margin:0}.sf-x .sf-ans{margin:0;justify-content:center}.sf-ans.pass{border-color:#59b7e6;color:#9bd3f0}
+.sf-warn{margin:6px 0;padding:8px 12px;border-radius:9px;background:rgba(230,126,23,.2);border:1px solid var(--orange,#e67e17);color:#ffd9a8;font-size:14px}
+.sf-rrows{display:grid;gap:8px;margin:12px 0}
+.sf-rrow{display:grid;grid-template-columns:34px 1fr 1.1fr 90px;gap:12px;align-items:center;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
+.sf-rrow .no{font:800 18px var(--font-head,inherit);color:var(--orange,#e67e17)}.sf-rrow .q{font-weight:600;color:#fff}.sf-rrow .a{color:#cfdde4}.sf-rrow .st{font-size:12px;text-align:right;color:#9fb3be}
+.sf-rrow.next{border-color:var(--orange,#e67e17);box-shadow:0 0 0 2px rgba(230,126,23,.35)}.sf-rrow.ok{background:#1f6b36}.sf-rrow.ok .a,.sf-rrow.bad .a{color:#fff}.sf-rrow.bad{background:#7d2118}
+.sf-fgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px}.sf-fgrid .box{background:rgba(255,255,255,.08);border-radius:12px;padding:14px;text-align:center;color:#fff}.sf-fgrid h3{margin:0;color:var(--orange,#e67e17)}.sf-fgrid .big{font:800 54px/1.1 var(--font-head,inherit)}

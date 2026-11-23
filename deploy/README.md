@@ -111,19 +111,21 @@ The projector then shows who buzzed first with the buzz-in sound, that team is *
 **Fallback:** if a phone fails, press "Team A first" or "Team B first" on the tech console or the emcee page: it does the same thing by
 hand. "Reset" closes the buzzers. This needs the self-hosted server.
 
-### Sai Five (the last round) on the day
-**One team answers each question first** (Team A on question 1, Team B on question 2, and so on; "⇄ Swap who goes first" changes it for
-one question). The **clock and its buttons are at the top of the page** (first-team seconds and steal seconds are editable there; the
-defaults are 30 and 15).
-1. Press **Start 30s**. When the team answers, click the board answer they said. If it is **not on the board**, click **✕ Not on the
-   board** (type what they said first and press Enter if you want the projector to show it). Press **Reveal** (or **R**): the projector
-   shows the answer and points with a ding, or a red ✕ with a buzzer.
-2. **If the first team was wrong** (or ran out of time), the projector shows "⚡ STEAL — Team B answers the same question · 15 seconds"
-   with a steal sound, and the tech's clock is set to the steal time. Press **Start 15s**, click what Team B said, **Reveal**.
-3. **If the first team was right** the question is finished; the other team's cell shows "—". (Tick "Both teams always answer" to
-   switch the steal rule off.)
-4. **Next question**; the small numbered buttons jump anywhere. After question 5, **Award Sai Five points** (points are 2× the board
-   points). Nothing is shown on the projector before you reveal it, later questions stay hidden, and every step can be undone.
+### Sai Five (the lightning round) on the day
+The first team gets **one clock (60 s) for all the questions**; then the second team plays the **same questions with less time (45 s)**.
+Both times are editable in the bar at the top of the page, along with Start / Pause / Reset. Wrong answers score 0 and the team keeps the
+points from its right answers; points are 2× the board points.
+1. **Team 1 plays.** Press **Start 60s**. As the team answers, click the board answer it said: it moves **straight to the next question**.
+   If they said something that is **not on the board**, click **✕ Not on the board** (type what they said and press Enter if you want it
+   shown). **Pass →** skips a question; it comes back after the last one if there is time. The projector shows only the current question,
+   a big countdown and progress dots, never the answers.
+2. **Time up** (the clock hits 0, or press **Stop the clock & reveal answers**). The projector shows the board with everything hidden;
+   press **R** (or Reveal answer) to reveal one answer at a time: a ding and the points for a right answer, a red ✕ with what was said and
+   a buzzer for a wrong one. **Reveal all** does the rest.
+3. **Team 2 plays** the same questions: press "Team B plays the same questions (45s)". The projector shows Team A's score to beat. Team 2
+   **may not repeat Team 1's answers** (a buzzer sounds and the tech asks for another; untick the box at the top to allow repeats).
+4. After Team 2's reveal, **Finish — award Sai Five points**. The points are added to the team scores. The winner is the team with more
+   total points; if tied, more Sai Five points, then more right answers. Every step can be undone.
 Pictures: `docs/screens/sai-five-*.png`.
 
 ### Answers and points when you tabulate

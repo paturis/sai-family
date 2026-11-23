@@ -44,17 +44,26 @@ html,body{background:radial-gradient(ellipse 90% 60% at 50% -10%,var(--navy-600)
 @keyframes pulse{50%{box-shadow:0 0 0 10px rgba(255,138,128,.2)}}
 .ok{text-align:center;color:var(--teal-on-dark);font-weight:700;font-size:clamp(16px,2vw,30px);margin-top:1vh}
 .sf{margin-top:1.4vh}
-.sfr{display:grid;grid-template-columns:3vw 1fr 23vw 23vw;gap:1vw;align-items:center;padding:1.1vh .8vw;border-top:1px solid rgba(255,255,255,.14)}
+.sfr{display:grid;grid-template-columns:2.6vw 1fr 21vw 21vw;gap:1vw;align-items:center;padding:.7vh .8vw;border-top:1px solid rgba(255,255,255,.14)}
 .sfr:first-child{border-top:0}.sfr.cur{background:rgba(230,126,23,.14);border-radius:1vh}.sfr.dim{opacity:.4}
 .sfr .no{font:700 clamp(22px,2.6vw,42px) var(--font-head);color:var(--orange-on-dark)}
-.sfr .sq{font-size:clamp(16px,2vw,32px);font-weight:700;line-height:1.2}
-.sfc{display:flex;flex-direction:column;position:relative;padding:.8vh 1vw;border-radius:1vh;background:rgba(255,255,255,.08);min-height:7vh;justify-content:center}
+.sfr .sq{font-size:clamp(13px,1.45vw,26px);font-weight:700;line-height:1.2}
+.sfc{display:flex;flex-direction:column;position:relative;padding:.8vh 1vw;border-radius:1vh;background:rgba(255,255,255,.08);min-height:6vh;justify-content:center}
 .sfc small{font:700 clamp(10px,.9vw,15px) var(--font);letter-spacing:.14em;text-transform:uppercase;opacity:.75}
-.sfc b{font-size:clamp(16px,1.9vw,30px)}.sfc i{position:absolute;right:.8vw;top:50%;transform:translateY(-50%);font:800 clamp(22px,2.6vw,42px)/1 var(--font-head);font-style:normal}
+.sfc b{font-size:clamp(14px,1.6vw,28px)}.sfc i{position:absolute;right:.8vw;top:50%;transform:translateY(-50%);font:800 clamp(20px,2.2vw,36px)/1 var(--font-head);font-style:normal}
+.sfplay{text-align:center;margin-top:2vh}
+.sfwho{text-transform:uppercase;display:inline-block;padding:.9vh 2vw;border-radius:99px;background:rgba(255,255,255,.12);font:800 clamp(18px,2.2vw,36px) var(--font);letter-spacing:.08em}.sfwho.second{background:#8a4b0f}
+.sfclock{font:800 clamp(90px,17vh,240px)/1 var(--font-head);margin:1vh 0;color:var(--orange-on-dark)}.sfclock.u{color:#ff6b62}
+.sfqn{font:700 clamp(14px,1.6vw,26px) var(--font);letter-spacing:.2em;color:#cfdde4}
+.sfqtext{font:800 clamp(28px,4.6vw,72px)/1.15 var(--font-head);max-width:84vw;margin:1.4vh auto}
+.sfdots{display:flex;gap:1.4vw;justify-content:center;margin-top:2vh}.sfdots i{width:2.2vw;height:2.2vw;max-width:34px;max-height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.4)}.sfdots i.on{background:var(--orange-on-dark);border-color:var(--orange-on-dark)}
+.sfprev{margin-top:3vh;font-size:clamp(16px,2vw,32px);color:#cfdde4}.sfprev b{color:#fff}
+.sf-win{margin:1vh auto;padding:1.2vh 2vw}.sf-win h2{margin:.4vh 0;font-size:clamp(26px,3.6vw,58px)}.sf-win .sfsub{margin-top:.6vh;font-size:clamp(13px,1.4vw,24px);color:#cfdde4}
+.sftot span{display:block;font-size:.5em;font-weight:600;color:#cfdde4;margin:0}
 .sfturn{margin:1.2vh auto 0;width:max-content;max-width:90%;padding:.9vh 2vw;border-radius:99px;background:rgba(255,255,255,.12);font:800 clamp(16px,1.9vw,30px) var(--font);letter-spacing:.06em;text-transform:uppercase;text-align:center}.sfturn.steal{background:#c0392b}
 .sfc.skip{opacity:.4}
 .sfc.ok{background:#1f6b36}.sfc.bad{background:#7d2118}.sfc.hid b{opacity:.5}
-.sftot{display:flex;justify-content:center;gap:6vw;margin-top:2vh;font-size:clamp(20px,2.4vw,40px);font-weight:700}.sftot b{color:var(--orange-on-dark);margin-left:.5vw}
+.sftot{display:flex;justify-content:center;gap:6vw;margin-top:1.2vh;font-size:clamp(18px,2.1vw,34px);font-weight:700}.sftot b{color:var(--orange-on-dark);margin-left:.5vw}
 .fq{display:flex;gap:1.4vw;padding:1.6vh 1vw;border-top:1px solid rgba(255,255,255,.14);align-items:baseline}
 .fq:first-child{border-top:0}
 .fq .no{font:700 clamp(22px,2.8vw,44px) var(--font-head);color:var(--orange-on-dark)}
@@ -423,18 +432,23 @@ function drawGame(){
     '<div class="team'+(ctl==='B'?' ctl':'')+'"><div><div class="l">TEAM B'+(ctl==='B'?'<span class="ctag">PLAYING</span>':'')+'</div><div class="n">'+esc(t.B.name)+'</div></div><div class="s">'+t.B.score+'</div></div></div>';
   if(D.view==='fast'&&D.fast){
     var F=D.fast;
-    var cell=function(r,k){var c=r[k],nm=esc(t[k].name);
-      if(!c)return '<div class="sfc hid"><small>'+nm+'</small><b>• • •</b></div>';
-      if(c.skip)return '<div class="sfc skip"><small>'+nm+'</small><b>—</b></div>';
-      if(c.ok)return '<div class="sfc ok"><small>'+nm+'</small><b>'+esc(c.t)+'</b><i>'+c.p+'</i></div>';
-      return '<div class="sfc bad"><small>'+nm+'</small><b>✕ '+esc(c.t||(c.none?'No answer':'Not on the board'))+'</b><i>0</i></div>'};
-    var tn=F.turn;
-    h+='<div class="cat">⚡ SAI FIVE · '+F.n+' QUESTIONS · 2× POINTS</div>'+(tn?'<div class="sfturn'+(tn.steal?' steal':'')+'">'+(tn.steal?'⚡ STEAL — ':'')+esc(t[tn.team].name)+' answers'+(tn.steal?' the same question':'')+' · '+tn.secs+' seconds</div>':'')+'<div class="sf">'+F.rows.map(function(r,i){
-      if(!r.q)return '<div class="sfr dim"><span class="no">'+(i+1)+'</span><div class="sq">• • •</div></div>';
-      return '<div class="sfr'+(i===F.q?' cur':'')+'"><span class="no">'+(i+1)+'</span><div class="sq">'+esc(r.q)+'</div>'+cell(r,'A')+cell(r,'B')+'</div>'}).join('')+'</div>'+
-      '<div class="sftot"><div>'+esc(t.A.name)+' <b>'+F.totals.A+'</b></div><div>'+esc(t.B.name)+' <b>'+F.totals.B+'</b></div></div>';
-    if(D.fast.awarded){var w=t.A.score===t.B.score?null:(t.A.score>t.B.score?t.A:t.B);
-      h+='<div class="win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It’s a tie — One Sai Family wins!')+'</h2><div>'+esc(t.A.name)+' '+t.A.score+' — '+t.B.score+' '+esc(t.B.name)+'</div></div>'}
+    if(F.step==='play'){
+      var dots='';for(var di=0;di<F.n;di++)dots+='<i class="'+(di<F.answered?'on':'')+'"></i>';
+      h+='<div class="cat">⚡ SAI FIVE · LIGHTNING ROUND · 2× POINTS</div><div class="sfplay"><div class="sfwho'+(F.second?' second':'')+'">'+esc(t[F.team].name)+' · '+F.secs+' SECONDS'+(F.second?' · SAME QUESTIONS':'')+'</div>'+
+        '<div class="sfclock" id="tm2">'+String(timeLeft()).padStart(2,'0')+'</div>'+
+        '<div class="sfqn">QUESTION '+(F.q+1)+' OF '+F.n+'</div><div class="sfqtext">'+esc(F.qtext)+'</div><div class="sfdots">'+dots+'</div>'+
+        (F.prev?'<div class="sfprev">'+esc(t[F.prev.team].name)+' scored <b>'+F.prev.points+'</b> with <b>'+F.prev.right+'</b> right — can '+esc(t[F.team].name)+' beat it?</div>':'')+'</div>';
+    }else{
+      var cell=function(r,k){var c=r[k],nm=esc(t[k].name);
+        if(!c)return '<div class="sfc hid"><small>'+nm+'</small><b>• • •</b></div>';
+        if(c.ok)return '<div class="sfc ok"><small>'+nm+'</small><b>'+esc(c.t)+'</b><i>'+c.p+'</i></div>';
+        return '<div class="sfc bad"><small>'+nm+'</small><b>✕ '+esc(c.t||(c.none?'No answer':'Not on the board'))+'</b><i>0</i></div>'};
+      h+='<div class="cat">⚡ SAI FIVE · '+esc(F.step==='done'?'RESULT':(t[F.team].name+' · ANSWERS'))+'</div><div class="sf">'+F.rows.map(function(r,i){
+        return '<div class="sfr"><span class="no">'+(i+1)+'</span><div class="sq">'+esc(r.q||'')+'</div>'+cell(r,'A')+cell(r,'B')+'</div>'}).join('')+'</div>'+
+        (F.step==='done'?'':'<div class="sftot"><div>'+esc(t.A.name)+' <b>'+F.totals.A+'</b><span>'+F.right.A+' right</span></div><div>'+esc(t.B.name)+' <b>'+F.totals.B+'</b><span>'+F.right.B+' right</span></div></div>');
+    }
+    if(D.fast.awarded){var w=D.fast.winner?t[D.fast.winner]:null;
+      h+='<div class="win sf-win"><div>FINAL RESULT</div><h2>'+(w?esc(w.name)+' wins!':'It’s a tie — One Sai Family wins!')+'</h2><div>'+esc(t.A.name)+' '+t.A.score+' — '+t.B.score+' '+esc(t.B.name)+'</div><div class="sfsub">Sai Five: '+esc(t.A.name)+' '+D.fast.totals.A+' pts · '+D.fast.right.A+' right &nbsp;—&nbsp; '+esc(t.B.name)+' '+D.fast.totals.B+' pts · '+D.fast.right.B+' right</div></div>'}
   }else if(D.round){
     var r=D.round;
     h+='<div class="cat">ROUND '+r.n+' OF '+r.of+' · '+esc(r.category.toUpperCase())+(r.mult>1?' · '+r.mult+'× POINTS':'')+'</div><div class="q">'+esc(r.question)+'</div>'+
@@ -445,7 +459,7 @@ function drawGame(){
       (r.awarded?'<div class="ok">Round awarded to '+esc(t[r.awarded.team].name)+' (+'+r.awarded.points+')</div>':'');
   }
   app.innerHTML=h;
-  clearInterval(timerT);if(D.timerRunning)timerT=setInterval(function(){var e=document.getElementById('tm'),l=timeLeft();if(e){e.textContent=String(l).padStart(2,'0')+'s';e.className='timer'+(l<=5?' u':'')}if(l>5)gTick=-1;else if(l>0&&l!==gTick){gTick=l;snd('tick')}},500)}
+  clearInterval(timerT);if(D.timerRunning)timerT=setInterval(function(){var e2=document.getElementById('tm2'),l2=timeLeft();if(e2){e2.textContent=String(l2).padStart(2,'0');e2.className='sfclock'+(l2<=10?' u':'')}var e=document.getElementById('tm'),l=timeLeft();if(e){e.textContent=String(l).padStart(2,'0')+'s';e.className='timer'+(l<=5?' u':'')}if(l>5)gTick=-1;else if(l>0&&l!==gTick){gTick=l;snd('tick')}},500)}
 /* ---------- every stage of the show on one continuous screen ---------- */
 function joinUrl(){var u=new URL('play.html',location.href);u.search='?code='+code;u.hash='';return u.toString()}
 function shortUrl(){return joinUrl().replace(/^https?:\/\//,'').replace(/\?.*$/,'')}
@@ -519,8 +533,7 @@ function soundForDoc(p,d){
   if(p&&p.fast&&d.fast){
     var sc=false,bad=false;   // a reveal: ding for points, buzzer for "not on the board" or no answer
     (d.fast.rows||[]).forEach(function(r,i){var pr=(p.fast.rows||[])[i]||{};['A','B'].forEach(function(k){if(r[k]&&!r[k].skip&&!pr[k]){if(r[k].ok)sc=true;else bad=true}})});
-    if(sc)snd('ding');if(bad)setTimeout(function(){snd('buzzer')},sc?450:0);
-    if(d.fast.turn&&d.fast.turn.steal&&!(p.fast.turn&&p.fast.turn.steal))setTimeout(function(){snd('steal')},bad?900:300)
+    if(sc)snd('ding');if(bad)setTimeout(function(){snd('buzzer')},sc?450:0)
     if(d.fast.awarded&&!p.fast.awarded){snd('fanfare');setTimeout(function(){snd('applause')},250)}}
   if(p&&p.timerRunning&&!d.timerRunning&&d.timerSeconds===0)snd('timeup')}
 function soundForLive(p,d){
