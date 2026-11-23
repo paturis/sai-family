@@ -62,14 +62,14 @@ app.store.users.upsert('ravi@example.org', 'host');
 const tech = await ctxPage(1440, 900);
 await tech.goto(`${base}/?login=${app.auth.createLoginLink('boss').token}&__test=1`, { waitUntil: 'networkidle0' });
 await tech.waitForSelector('.a-tabs', { timeout: 10000 });
-const hash = () => tech.evaluate(() => location.hash);
-check('URL: the dashboard is #/sessions', await waitFn(tech, () => location.hash === '#/sessions'), await hash());
+const hash = () => tech.evaluate(() => location.pathname);
+check('URL: the dashboard is /sessions', await waitFn(tech, () => location.pathname === '/sessions'), await hash());
 await tc(tech, '[data-a="tab"][data-t="bank"]');
-check('URL: the question bank tab is #/questions', await waitFn(tech, () => location.hash === '#/questions'), await hash());
+check('URL: the question bank tab is /questions', await waitFn(tech, () => location.pathname === '/questions'), await hash());
 await tech.goBack();
-check('URL: Back returns to Sessions (page and address)', await waitFn(tech, () => location.hash === '#/sessions' && document.querySelector('.a-tabs .on').dataset.t === 'surveys'), await hash());
+check('URL: Back returns to Sessions (page and address)', await waitFn(tech, () => location.pathname === '/sessions' && document.querySelector('.a-tabs .on').dataset.t === 'surveys'), await hash());
 await tech.goForward();
-check('URL: Forward returns to the question bank', await waitFn(tech, () => location.hash === '#/questions' && document.querySelector('.a-tabs .on').dataset.t === 'bank'), await hash());
+check('URL: Forward returns to the question bank', await waitFn(tech, () => location.pathname === '/questions' && document.querySelector('.a-tabs .on').dataset.t === 'bank'), await hash());
 await tc(tech, '[data-a="tab"][data-t="surveys"]');
 await tech.evaluate(async () => {
   const { A, loadAll, openSv, orderQs } = window.__console;
@@ -79,10 +79,10 @@ await tech.evaluate(async () => {
   const id = await Cloud.createSurvey({ name: 'Camp Show', status: 'draft', questions: orderQs(qs), code: '' });
   await loadAll(); await openSv(id);
 });
-check('URL: an open session is #/sessions/ID', await waitFn(tech, () => /^#\/sessions\/[^/]+$/.test(location.hash)), await hash());
+check('URL: an open session is /sessions/ID', await waitFn(tech, () => /^\/sessions\/[^/]+$/.test(location.pathname)), await hash());
 await tc(tech, '[data-a="launch"]');
 await tech.waitForSelector('[data-a="open0"]', { timeout: 8000 });
-check('URL: the lobby is #/live/ID/lobby', await waitFn(tech, () => /^#\/live\/[^/]+\/lobby$/.test(location.hash)), await hash());
+check('URL: the lobby is /live/ID/lobby', await waitFn(tech, () => /^\/live\/[^/]+\/lobby$/.test(location.pathname)), await hash());
 const code = await tech.evaluate(() => window.__console.A.sv.code);
 console.log('survey launched with code', code);
 
@@ -120,9 +120,9 @@ check('EMCEE sees "waiting for the first question" and phone count', await waitT
 /* ---------- survey questions ---------- */
 const words = ['Honesty', 'Kindness', 'Love', 'Service', 'Humility'];
 await tc(tech, '[data-a="open0"]');
-check('URL: collecting is #/live/ID/question/1', await waitFn(tech, () => /\/question\/1$/.test(location.hash)), await hash());
+check('URL: collecting is /live/ID/question/1', await waitFn(tech, () => /\/question\/1$/.test(location.pathname)), await hash());
 await tech.goBack(); await sleep(400);
-check('URL: Back is blocked during a live session (stays on the question)', await tech.evaluate(() => /\/question\/1$/.test(location.hash) && !!document.getElementById('r0Count')), await hash());
+check('URL: Back is blocked during a live session (stays on the question)', await tech.evaluate(() => /\/question\/1$/.test(location.pathname) && !!document.getElementById('r0Count')), await hash());
 check('PROJECTOR question: number, text, countdown', await waitText(proj, /QUESTION 1 OF 9/) && await waitFn(proj, () => /^\d+$/.test((document.getElementById('qt') || {}).textContent || '')), waitText.last);
 const q1 = await tech.evaluate(() => window.__console.items()[0].r.question.en);
 check('PROJECTOR shows the actual question text', (await text(proj)).includes(q1.slice(0, 30)));
@@ -146,7 +146,7 @@ await sleep(300);
 /* ---------- counting, then the gate, then the game ---------- */
 await tc(tech, '[data-a="next"]');                                   // Finish & tabulate
 await tech.waitForSelector('.r0-table', { timeout: 15000 });
-check('URL: tabulating is #/live/ID/tabulate/1 and follows the question tab', await waitFn(tech, () => /\/tabulate\/1$/.test(location.hash)) && (await tech.evaluate(() => { document.querySelector('[data-a="tab"][data-i="2"]').click(); return true; })) && await waitFn(tech, () => /\/tabulate\/3$/.test(location.hash)), await hash());
+check('URL: tabulating is /live/ID/tabulate/1 and follows the question tab', await waitFn(tech, () => /\/tabulate\/1$/.test(location.pathname)) && (await tech.evaluate(() => { document.querySelector('[data-a="tab"][data-i="2"]').click(); return true; })) && await waitFn(tech, () => /\/tabulate\/3$/.test(location.pathname)), await hash());
 await tech.evaluate(() => document.querySelector('[data-a="tab"][data-i="0"]').click());
 await sleep(300); await snap(proj, 'p3-projector-counting'); await snap(tech, 't3-tech-tabulate');
 check('PROJECTOR "counting the votes" while the tech works', await waitText(proj, /Counting the votes/), waitText.last);
@@ -173,12 +173,12 @@ check('Undo AI merge restores the earlier groups exactly', await tech.evaluate((
 check('Undo button disabled again once used', await tech.evaluate(() => document.querySelector('[data-a="aiundo"]').disabled));
 await tc(tech, '[data-a="apply"]');
 await tech.waitForSelector('[data-a="begin"]', { timeout: 8000 });
-check('URL: the gate is #/live/ID/gate', await waitFn(tech, () => /\/gate$/.test(location.hash)), await hash());
+check('URL: the gate is /live/ID/gate', await waitFn(tech, () => /\/gate$/.test(location.pathname)), await hash());
 await sleep(300); await snap(proj, 'p4-projector-gate'); await snap(emcee, 'e3-emcee-gate');
 check('PROJECTOR gate: "contestants please come up"', await waitText(proj, /Thank you, audience![\s\S]*Contestants/), waitText.last);
 check('EMCEE told to invite the contestants', await waitText(emcee, /Invite the contestants up/), waitText.last);
 await tc(tech, '[data-a="begin"]');
-check('URL: the board is #/live/ID/board/round/1', await waitFn(tech, () => /\/board\/round\/1$/.test(location.hash)), await hash());
+check('URL: the board is /live/ID/board/round/1', await waitFn(tech, () => /\/board\/round\/1$/.test(location.pathname)), await hash());
 check('PROJECTOR switches to the game board by itself', await waitFn(proj, () => document.querySelectorAll('.a').length === 5, null, 10000), await text(proj));
 check('PROJECTOR played the intro music when the game began', (await played()).includes('intro'));
 check('EMCEE follows to the board automatically (hidden answers visible)', await waitFn(emcee, () => document.querySelectorAll('.ans').length === 5, null, 12000), await text(emcee));
@@ -243,8 +243,8 @@ await tc(tech, '[data-fo="reset"]');
 await emc2.close();
 /* deep link: a bookmarked address lands on the right page after sign-in */
 const deep = await ctxPage(1280, 800);
-await deep.goto(`${base}/?login=${app.auth.createLoginLink('boss').token}#/questions`, { waitUntil: 'networkidle0' });
-check('URL: opening #/questions after sign-in lands on the question bank', await waitFn(deep, () => location.hash === '#/questions' && document.querySelector('.a-tabs .on') && document.querySelector('.a-tabs .on').dataset.t === 'bank'), await deep.evaluate(() => location.hash));
+await deep.goto(`${base}/questions?login=${app.auth.createLoginLink('boss').token}`, { waitUntil: 'networkidle0' });
+check('URL: opening /questions after sign-in lands on the question bank', await waitFn(deep, () => location.pathname === '/questions' && document.querySelector('.a-tabs .on') && document.querySelector('.a-tabs .on').dataset.t === 'bank'), await deep.evaluate(() => location.pathname));
 await deep.close();
 /* the other games (Jeopardy, Antakshari…) also play through the projector */
 const otherSnd = await proj.evaluate(() => {

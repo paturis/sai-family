@@ -206,7 +206,7 @@ test('presence: the tech can see the projector, emcees, other tech consoles and 
 
 test('static files: pages served, secrets and traversal blocked, backend switch is "server"', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-'));
-  fs.writeFileSync(path.join(dir, 'index.html'), '<h1>hi</h1>');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<head><title>t</title></head><h1>hi</h1>');
   fs.writeFileSync(path.join(dir, 'play.html'), '<h1>play</h1>');
   fs.writeFileSync(path.join(dir, 'firestore.rules'), 'secret');
   fs.writeFileSync(path.join(dir, '.env'), 'GEMINI_API_KEY=secret');
@@ -230,7 +230,15 @@ test('static files: pages served, secrets and traversal blocked, backend switch 
   try {
     const get = async (p) => fetch(s.base + p);
     assert.equal((await get('/')).status, 200);
-    assert.equal(await (await get('/')).text(), '<h1>hi</h1>');
+    assert.equal(await (await get('/')).text(), '<head><title>t</title></head><h1>hi</h1>');
+    // the console's own pages have real addresses; each is the same app with <base> so assets still load
+    for (const route of ['/sessions', '/questions/new', '/sessions/abc123/edit', '/live/abc123/tabulate/2', '/live/abc123/board/round/1', '/games/jeopardy']) {
+      const r = await get(route); assert.equal(r.status, 200, route);
+      assert.match(await r.text(), /<head><base href="\/">/, route);
+    }
+    assert.equal((await get('/nothing')).status, 404, 'unknown paths are still 404');
+    assert.equal((await get('/sessions/..%2f..%2fetc')).status, 404);
+    assert.equal((await get('/live/a/b/%00')).status, 404);
     assert.equal((await get('/play.html')).status, 200);
     assert.equal((await get('/firestore.rules')).status, 404);
     assert.equal((await get('/.env')).status, 404);

@@ -31,6 +31,9 @@ const MIME = {
   '.m4a': 'audio/mp4',
 };
 // Only these file names are served from the web folder (no dotfiles, no rules/config of other stacks).
+// Pages of the tech console have real addresses (/sessions, /questions, /live/ID/lobby, …). Any of them, opened directly or
+// reloaded, is the same single app: serve index.html (with <base href="/"> so its css, scripts and fonts still load).
+const APP_ROUTE = /^\/(?:sessions|questions|team|games|live)(?:\/(?!\.+(?:\/|$))[A-Za-z0-9_.-]+)*\/?$/;
 const STATIC_OK = /^(?:(?:fonts|sounds)\/|sounds\/[a-z0-9_-]+\/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(html|js|css|png|svg|ico|woff2|mp3|ogg|wav|m4a)$/;
 const SOUND_FILE = /^[a-z0-9_-]+\.(mp3|ogg|wav|m4a)$/;
 const BIG_FILE = 2 * 1024 * 1024; // larger files (music) are streamed, not kept in memory
@@ -196,6 +199,8 @@ export async function createApp(overrides = {}) {
     let name;
     try { name = decodeURIComponent(p).replace(/^\/+/, ''); } catch { throw new HttpError(404, 'not_found', 'Not found'); }
     if (name === '') name = 'index.html';
+    const appRoute = APP_ROUTE.test('/' + name);
+    if (appRoute) name = 'index.html';
     if (!STATIC_OK.test(name)) throw new HttpError(404, 'not_found', 'Not found');
     const file = path.join(config.webRoot, name);
     let st;
@@ -213,6 +218,11 @@ export async function createApp(overrides = {}) {
       const buf = fs.readFileSync(file);
       c = { mtime: st.mtimeMs, buf, etag: `"${crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16)}"` };
       fileCache.set(file, c);
+    }
+    if (appRoute) {
+      const html = c.buf.toString('utf8').replace(/<head>/i, '<head><base href="/">');
+      res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-cache', ...SECURITY_HEADERS, 'Content-Length': Buffer.byteLength(html) });
+      return res.end(req.method === 'HEAD' ? undefined : html);
     }
     const headers = { 'Content-Type': MIME[path.extname(name)] || 'application/octet-stream', 'Cache-Control': name.endsWith('.woff2') ? 'public, max-age=604800' : name.startsWith('sounds/') ? 'public, max-age=3600' : 'no-cache', ETag: c.etag, ...SECURITY_HEADERS };
     if (req.headers['if-none-match'] === c.etag) { res.writeHead(304, headers); return res.end(); }

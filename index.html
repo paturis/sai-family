@@ -781,7 +781,7 @@ function saveGroupsSoon(){clearTimeout(grpT);grpT=setTimeout(()=>{if(A.surveyId)
 
 /* ---------- QR ---------- */
 function qrSvg(url){try{const q=qrcode(0,'M');q.addData(url);q.make();return q.createSvgTag({cellSize:8,margin:2,scalable:true})}catch(e){return'<div class="r0-qrerr">Could not draw QR</div>'}}
-const playUrl=c=>{const u=new URL('play.html',location.href);u.search='?code='+c;u.hash='';return u.toString()};
+const playUrl=c=>{const u=new URL('play.html',document.baseURI);u.search='?code='+c;u.hash='';return u.toString()};
 
 /* ---------- survey <-> game ---------- */
 function gameData(sv){
@@ -1067,7 +1067,7 @@ async function onUser(u){
     try{await loadAll()}catch(e){A.status='Could not load data: '+e.message}
     if(saved.surveyId&&['lobby','collect','tabulate','gate'].includes(saved.resume)){const sv=await Cloud.getSurvey(saved.surveyId).catch(()=>null);if(sv){A.sv=sv;A.surveyId=sv.id;await resumeSurvey();return}}
     if(saved.surveyId&&['off','gplay'].includes(saved.resume)){const sv=await Cloud.getSurvey(saved.surveyId).catch(()=>null);if(sv&&await resumeGameStage(sv))return}
-    A.stage='dash';paint();if(initialRoute&&/^#\/(questions|team|games|sessions|live)/.test(initialRoute))applyRoute(initialRoute)
+    A.stage='dash';paint();if(initialRoute&&/^\/(questions|team|games|sessions|live)/.test(initialRoute))applyRoute(initialRoute)
   }else{A.user=u;A.stage='denied';paint()}}
 const isAdmin=()=>A.role==='admin';
 /* Reload / accidental Back while a game is running: put the tech straight back into it (no prompt). */
@@ -1087,7 +1087,7 @@ function syncHeaderRole(){const w=document.getElementById('viewAsWrap'),s=docume
 function setViewAs(r){
   if(A.realRole!=='admin'||!['admin','tech','host'].includes(r))return;
   A.role=r;
-  if(r==='host'){A.stage='hostonly';paint();try{window.open(new URL('emcee.html',location.href).toString(),'_blank')}catch(e){}return}
+  if(r==='host'){A.stage='hostonly';paint();try{window.open(new URL('emcee.html',document.baseURI).toString(),'_blank')}catch(e){}return}
   guard(goDash,'Could not load')}
 document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.viewas!==undefined)setViewAs(t.value)});
 /* One-time login link for a person (self-hosted mode): copy it and show it so it can be sent. */
@@ -1191,7 +1191,7 @@ function updateStatsDom(){updateConn();const s=A.stats;if(!s)return;
 async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch(e){const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}ta.remove();return ok}}
 function showLinks(){
   const sv=A.sv;if(!sv||!sv.code){toast('Open a survey first — links appear once it has a code.');return}
-  const emcee=new URL('emcee.html',location.href);emcee.search='';emcee.hash='';
+  const emcee=new URL('emcee.html',document.baseURI);emcee.search='';emcee.hash='';
   const L=[['Projector laptop — open once and leave it running',displayUrl(),'Press F for full screen and click once to turn the sound on. Connect THIS laptop to the hall speakers: it plays every sound. It shows the join QR code, each question with the live answer count, then the game board — by itself. No sign-in needed.'],
     ['Emcee phones',emcee.toString(),(Cloud.mode==='server'?'The emcee signs in with their email link (add them as host in the Team tab), then picks “':'Sign in with Google, then pick “')+(sv.name||'the game')+'”. They see the hidden answers, strikes, scores and the survey progress.'],
     ['Audience phones (the QR link)',playUrl(sv.code),'Everyone joins here. Code: '+sv.code+(location.protocol==='file:'?' — WARNING: this page was opened from a file, so phones cannot use this link.':'')]];
@@ -1209,6 +1209,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=document.ge
 /* ---------- URLs: the address bar follows where you are (#/questions, #/sessions/ID, #/live/ID/tabulate/2, …).
    Reload and bookmarks land in the right place, and Back / Forward browse the dashboard, bank and session pages.
    While a session is running (lobby → game) Back is blocked on purpose: a stray click must not leave a live show. ---------- */
+const USE_PATH=window.BACKEND==='server';   // self-hosted: real addresses; static hosting (GitHub Pages): #/addresses
+const here=()=>USE_PATH?location.pathname:location.hash.replace(/^#/,'');
 const ACTIVE=['lobby','collect','tabulate','gate','off','gplay'];
 const active=()=>ACTIVE.includes(A.stage);
 function routeOf(){
@@ -1232,7 +1234,7 @@ function routeOf(){
 let urlKey='',routing=false;
 function syncUrl(){
   const r=routeOf();if(!r)return;                       // sign-in / denied: leave the address alone (a deep link survives sign-in)
-  const h='#'+r;if(location.hash===h)return;
+  if(here()===r)return;const h=USE_PATH?r:'#'+r;
   const key=A.stage+'|'+(A.stage==='dash'?A.tab:'')+'|'+(A.sv&&A.sv.id||'')+'|'+((A.qf&&A.qf.id)||(A.form&&A.form.id)||(A.gf&&A.gf.id)||'');
   try{if(routing||!urlKey||key===urlKey)history.replaceState(null,'',h);else history.pushState(null,'',h)}catch(e){}
   urlKey=key}
@@ -1258,10 +1260,10 @@ async function applyRoute(hash){
   }catch(e){console.error(e)}
   finally{routing=false;syncUrl()}}
 window.addEventListener('popstate',()=>{
-  if(active()){try{history.pushState(null,'','#'+routeOf())}catch(e){}toast('Back is disabled while a session is running — use the on-screen buttons.');return}
-  urlKey='';applyRoute(location.hash)});
+  if(active()){try{history.pushState(null,'',USE_PATH?routeOf():'#'+routeOf())}catch(e){}toast('Back is disabled while a session is running — use the on-screen buttons.');return}
+  urlKey='';applyRoute(here())});
 window.addEventListener('beforeunload',e=>{if(active()){e.preventDefault();e.returnValue=''}});
-const initialRoute=location.hash;
+const initialRoute=here();
 async function boot(){
   paint();
   if(Cloud.configured()){try{await Cloud.start(window.BACKEND==='server'?'server':'firebase',window.FIREBASE_CONFIG);Cloud.onAuth(onUser)}catch(e){A.status='Could not start the back end: '+e.message;paint()}}}
@@ -1342,7 +1344,7 @@ function displayState(){
       answers:r.answers.map((a,i)=>rs.revealed[i]?{on:true,t:a.en,p:a.count}:{on:false}),strikes:rs.strikes,control:rs.control,
       steal:rs.strikes>=3&&!rs.awarded,stealTeam:rs.control==='A'?'B':'A',awarded:rs.awarded||null}}
   return base}
-const displayUrl=()=>{const u=new URL('display.html',location.href);u.search='?code='+(A.sv?A.sv.code:'');u.hash='';return u.toString()};
+const displayUrl=()=>{const u=new URL('display.html',document.baseURI);u.search='?code='+(A.sv?A.sv.code:'');u.hash='';return u.toString()};
 let dispT=null;
 /* ---- game autosave so another laptop can take over, plus the public scoreboard ---- */
 if(typeof persist==='function'){const _p=persist;persist=function(){_p();try{renderProjPanel()}catch(e){}clearTimeout(gameT);clearTimeout(dispT);

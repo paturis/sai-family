@@ -111,6 +111,13 @@ The projector then shows who buzzed first with the buzz-in sound, that team is *
 **Fallback:** if a phone fails, press "Team A first" or "Team B first" on the tech console or the emcee page: it does the same thing by
 hand. "Reset" closes the buzzers. This needs the self-hosted server.
 
+### Addresses (tech console)
+The tech console has real addresses that change as you move: `/sessions`, `/questions`, `/team`, `/sessions/ID`, `/live/ID/lobby`,
+`/live/ID/question/3`, `/live/ID/tabulate/2`, `/live/ID/gate`, `/live/ID/board/round/2`. Reload, bookmarks and shared links open the right
+page, and Back/Forward browse the dashboard, question bank and session pages. While a show is running (lobby to board) Back is blocked on
+purpose. The server answers all of these with the same app (`index.html`), so nothing extra is needed in Caddy. On static hosting
+(GitHub Pages) the same addresses are used after a `#`.
+
 ### Taking mistakes back (tech)
 Everything the tech does on the board can be undone: reveals, hides, strikes, who has control, awarding a round (even to the wrong
 team), score corrections and Fast Money. **Z** or **Ctrl/⌘+Z** undoes the last action, **Shift+Z** redoes it, and the sidebar shows the
